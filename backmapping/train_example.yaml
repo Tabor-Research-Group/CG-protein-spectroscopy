@@ -1,0 +1,98 @@
+# Example training configuration for backmap_diffusion_production
+#
+# Copy this file and edit paths/hyperparameters as needed.
+
+data:
+#  pickle_path: /scratch/user/vijay_jeyaraj/spectroscopy-proteins/extracted_pdb_files/CG_backmap_frame/GNN-spherical/backmap_diffusion_production_2_2_3/tiny.pkl
+  pickle_path: /scratch/user/vijay_jeyaraj/spectroscopy-proteins/extracted_pdb_files/amino_acid_baskets_complete_300.pkl
+#  pickle_path: /scratch/user/vijay_jeyaraj/spectroscopy-proteins/extracted_pdb_files/amino_acid_baskets_complete_new.pkl
+  drop_zero_atoms: true
+  max_sidechain_beads: 4
+  fully_connected_edges: true
+  include_sidechains: true
+  max_oscillators: null
+
+  # split settings
+  train_frac: 0.8
+  val_frac: 0.1
+  test_frac: 0.1
+  split_seed: 123
+  split_by: folder        # folder (recommended) or random (debug)
+  min_items_per_split: 1
+
+  dtype: float32
+
+diffusion:
+  timesteps: 200
+  beta_schedule: cosine
+  beta_start: 0.0001
+  beta_end: 0.02
+
+model:
+  hidden_dim: 256
+  num_layers: 6
+  dropout: 0.0
+  time_embed_dim: 128
+  pos_embed_dim: 64
+  rbf_num_centers: 16
+  rbf_max_dist: 20.0
+  max_atom_radius: 6.0
+
+loss:
+  # denoising
+  w_denoise_cart: 1.0
+  w_denoise_sph: 0.7
+
+  # geometry / physics
+  w_bond: 0.7
+  w_angle: 0.7
+  w_dihedral: 1.0
+  w_dipole: 1.0
+
+  # stability penalty
+  w_contact: 0.5
+  contact_r0: 2.0
+
+  max_term_value: 1000.0
+  eps: 1.0e-8
+  r_min: 0.5
+
+train:
+  out_dir: runs/backmap_diffusion_prod
+  epochs: 500
+  batch_size: 16
+  lr: 0.0001
+  weight_decay: 1.0e-6
+  grad_clip_norm: 1.0
+
+  # performance
+  num_workers: 0
+  pin_memory: false
+  device: cuda
+
+  # logging / eval
+  log_every_steps: 50
+  eval_every_epochs: 1
+  test_every_epochs: 1
+  save_every_epochs: 1
+  max_eval_batches: null
+  amp: false
+
+  seed: 123
+
+plot:
+  enable: true
+  every_epochs: 1
+  max_eval_batches: null
+  bins: 60
+
+viz:
+  enable: true
+  every_epochs: 1
+  frames_per_epoch: 5
+  max_oscillators_per_frame: null
+  split: val
+
+infer:
+  # used by visualization sampling in training; also used as default by scripts/infer.py
+  init: uniform_ball

@@ -1,0 +1,161 @@
+# Complete Configuration for Trajectory-Based Inference
+# All parameters can be set here - no command line arguments needed
+#
+# CRITICAL: Model/data/diffusion parameters MUST match your training config exactly!
+
+# ============================================================================
+# DATA CONFIGURATION
+# ============================================================================
+data:
+  # Path to pickle file - used ONLY for building vocabulary
+  pickle_path: "/scratch/user/vijay_jeyaraj/spectroscopy-proteins/extracted_pdb_files/CG_backmap_frame/GNN-spherical/backmap_diffusion_production_2_2_3/tiny.pkl"
+  
+  # Dataset processing (MUST match training!)
+  drop_zero_atoms: true
+  max_sidechain_beads: 4
+  fully_connected_edges: true
+  include_sidechains: true
+  max_oscillators: null
+  dtype: "float32"
+
+# ============================================================================
+# MODEL ARCHITECTURE (MUST match training!)
+# ============================================================================
+model:
+  # Core architecture
+  hidden_dim: 256
+  num_layers: 6
+  dropout: 0.0
+  
+  # Embeddings
+  time_embed_dim: 128
+  pos_embed_dim: 64
+  
+  # Edge encodings
+  rbf_num_centers: 16
+  rbf_max_dist: 20.0
+  
+  # Geometric cutoffs (Å)
+  max_atom_radius: 6.0
+  bead_edge_cutoff: 10.0  # IMPORTANT: Used for EdgeCutoffs
+  atom_edge_cutoff: 10.0  # IMPORTANT: Used for EdgeCutoffs
+
+# ============================================================================
+# DIFFUSION PARAMETERS (MUST match training!)
+# ============================================================================
+diffusion:
+  timesteps: 200
+  beta_schedule: "cosine"
+  beta_start: 0.0001
+  beta_end: 0.02
+  clip_radius_each_step: true
+  sample_init: "uniform_ball"
+
+# ============================================================================
+# LOSS CONFIGURATION (for compatibility)
+# ============================================================================
+loss:
+  # Denoising losses
+  w_denoise_cart: 1.0
+  w_denoise_sph: 0.7
+  
+  # Geometry losses
+  w_bond: 0.7
+  w_angle: 0.7
+  w_dihedral: 1.0
+  w_dipole: 1.0
+  
+  # Stability
+  w_contact: 0.5
+  contact_r0: 2.0
+  max_term_value: 1000.0
+  eps: 1.0e-8
+  r_min: 0.5
+
+# ============================================================================
+# DEVICE CONFIGURATION
+# ============================================================================
+train:
+  device: "cuda"  # or "cpu"
+  amp: false      # Mixed precision for training (not used in inference)
+
+# ============================================================================
+# INFERENCE CONFIGURATION
+# ============================================================================
+infer:
+
+  # -------------------------------------------------------------------------
+  # Protein Settings
+  # -------------------------------------------------------------------------
+  protein_name: "3fp5_A"
+  protein_folder: "/scratch/user/vijay_jeyaraj/spectroscopy-proteins/extracted_pdb_files/3fp5_A"
+  
+  # -------------------------------------------------------------------------
+  # Output Settings
+  # -------------------------------------------------------------------------
+  output: "denoise_results_new/3fp5_A.pkl"
+  
+  # -------------------------------------------------------------------------
+  # Trajectory File Names
+  # -------------------------------------------------------------------------
+  xtc_filename: "prod_centered.xtc"
+  #  xtc_filename: "prod.xtc"
+  tpr_filename: "prod.tpr"
+  cg_pdb_pattern: "{folder}_CG_protein_only_full_trajectory.pdb"
+  
+  # -------------------------------------------------------------------------
+  # Processing Options
+  # -------------------------------------------------------------------------
+  chunk_size: 1000          
+  max_frames: 5000          # Number of frames to process (null for all frames)
+  frame_selection: first    # Options: 'first', 'last', 'range', 'random'
+  frame_range: [0, 5000]    # Used when frame_selection is 'range' [start, end]
+  random_seed: 123
+  sort_random_frames: true
+  extract_atomistic: true # Extract ground truth (VERY SLOW! Only for validation)
+
+  hamiltonian_file: diagonal_hamiltonian.txt
+  require_hamiltonians: true
+  strict_hamiltonian_validation: true
+  
+  # -------------------------------------------------------------------------
+  # Fast Inference Options (only for infer_from_trajectory_fast.py)
+  # -------------------------------------------------------------------------
+  ddim_steps: 50          # DDIM sampling steps (20-100, lower=faster)
+  use_fp16: true          # Use mixed precision (faster, slightly lower precision)
+  use_amp: true
+
+  save_intermediate: true
+  
+  # -------------------------------------------------------------------------
+  # Sampling Settings
+  # -------------------------------------------------------------------------
+  batch_size: 4126         # Batch size for inference
+  init: "uniform_ball"    # Sampling initialization: "uniform_ball" or "gaussian"
+  
+  # -------------------------------------------------------------------------
+  # Vocabulary Source
+  # -------------------------------------------------------------------------
+  vocab_pickle: "/scratch/user/vijay_jeyaraj/spectroscopy-proteins/extracted_pdb_files/CG_backmap_frame/GNN-spherical/backmap_diffusion_production_2_2_3/tiny.pkl"
+  
+  # -------------------------------------------------------------------------
+  # Parallel Graph Building (not implemented yet)
+  # -------------------------------------------------------------------------
+  num_workers: 8          # CPU workers for parallel graph building (0=sequential, 1-16=parallel)
+  
+
+  compute_analysis: true                # predicted dipole + predicted rama
+  compute_atomistic_analysis: true      # atomistic dipole + atomistic rama (only if extract_atomistic=true)
+# ============================================================================
+# NOTES
+# ============================================================================
+# 1. To run inference, edit only the "infer:" section above
+# 2. DO NOT change model/diffusion/data sections unless you know they differ from training
+# 3. Key parameters for testing:
+#    - max_frames: 10 (test with 10 frames first)
+#    - chunk_size: 20 (for robust), 50 (for fast)
+#    - extract_atomistic: false (only enable for validation - makes it 3-5x slower)
+# 4. For production runs:
+#    - max_frames: null (process all frames)
+#    - chunk_size: 50 (fast) or 20 (robust)
+# 5. EdgeCutoffs uses bead_edge_cutoff and atom_edge_cutoff from model section

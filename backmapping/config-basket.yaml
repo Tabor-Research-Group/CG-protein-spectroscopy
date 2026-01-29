@@ -1,0 +1,24 @@
+# Where are your protein folders?
+base_directory: "."
+
+# How many frames to process? (null = all frames)
+frames_to_process: 500
+
+frame_selection_method: "random"
+
+# How many CPU cores?
+cpu_cores: 8
+
+# Output filename
+output_filename: "amino_acid_baskets_complete_500.pkl"
+
+strict_validation: true
+
+# Visualization settings
+create_visualization: true
+visualize_amino_acid: "PHE"
+
+# File naming (if different from defaults)
+atomistic_trajectory_file: "prod_centered.xtc"
+atomistic_topology_file: "prod.tpr"
+cg_pdb_file_pattern: "{folder}_CG_protein_only_full_trajectory.pdb"
