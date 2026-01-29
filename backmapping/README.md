@@ -50,7 +50,7 @@ python extract_cg_atomistic_data_basket.py --config config-basket.yaml
 python scripts/train.py --config train_example.yaml
 
 # 3. Run inference
-python inference/inference.py --config inference/config_inference_traj.yaml --checkpoint best.pt
+python inference.py --config config_inference_traj.yaml --checkpoint best.pt
 
 # 4. Generate plots
 python plot_backmap_validation.py --root denoise_results_new --output-dir plots
@@ -58,7 +58,7 @@ python plot_backmap_validation.py --root denoise_results_new --output-dir plots
 
 ---
 
-## Data Extraction
+## Data Extraction For Training
 
 ### Input Data Structure
 
@@ -286,8 +286,8 @@ infer:
 ### Running Inference
 
 ```bash
-python inference/inference.py \
-    --config inference/config_inference_traj.yaml \
+python inference.py \
+    --config config_inference_traj.yaml \
     --checkpoint best.pt
 ```
 
