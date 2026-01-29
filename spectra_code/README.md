@@ -411,23 +411,4 @@ The pipeline includes automatic filtering for:
 - Missing coordinate data
 - Frames with too few oscillators
 
-## Citation
 
-If you use this code in your research, please cite:
-
-```bibtex
-@article{your_paper,
-    title={Neural Network Prediction of Amide I IR Spectra from Coarse-Grained Protein Structures},
-    author={Your Name et al.},
-    journal={Journal Name},
-    year={Year}
-}
-```
-
-## License
-
-[Add your license information here]
-
-## Contact
-
-[Add contact information here]
