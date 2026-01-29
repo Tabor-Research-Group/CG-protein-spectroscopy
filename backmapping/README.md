@@ -50,10 +50,11 @@ python extract_cg_atomistic_data_basket.py --config config-basket.yaml
 python scripts/train.py --config train_example.yaml
 
 # 3. Run inference
-# If ground truth needed for plotting or validation
+# If ground truth needed along with inference for plotting or validation
+# Change extract_atomistic: false in config file to true 
 python inference_with_gt.py --config config_inference_traj.yaml --checkpoint best.pt
 
-# If only predcition is needed from CG trajectory
+# If only inference is needed from CG trajectory
 python inference_cg_only.py --config config_inference_traj.yaml --checkpoint best.pt
 
 # 4. Generate plots
