@@ -50,7 +50,11 @@ python extract_cg_atomistic_data_basket.py --config config-basket.yaml
 python scripts/train.py --config train_example.yaml
 
 # 3. Run inference
-python inference.py --config config_inference_traj.yaml --checkpoint best.pt
+# If ground truth needed for plotting or validation
+python inference_with_gt.py --config config_inference_traj.yaml --checkpoint best.pt
+
+# If only predcition is needed from CG trajectory
+python inference_cg_only.py --config config_inference_traj.yaml --checkpoint best.pt
 
 # 4. Generate plots
 python plot_backmap_validation.py --root denoise_results_new --output-dir plots
@@ -286,7 +290,12 @@ infer:
 ### Running Inference
 
 ```bash
-python inference.py \
+python inference_with_gt.py \
+    --config config_inference_traj.yaml \
+    --checkpoint best.pt
+```
+```bash
+python inference_cg_only.py \
     --config config_inference_traj.yaml \
     --checkpoint best.pt
 ```
