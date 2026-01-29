@@ -1,0 +1,31 @@
+{
+  "model_path": "best_model.pt",
+  "data_path": "/scratch/user/vijay_jeyaraj/spectroscopy-proteins/extracted_pdb_files/CG_backmap_frame/GNN-spherical/backmap_diffusion_production_2_2_3/denoise_results_new/3fp5_A.pkl",
+  "output_dir": "./3fp5_A_results",
+
+  "model_config": {
+    "own_feature_dim": 16,
+    "neighbor_feature_dim": 18,
+    "d_model": 128,
+    "n_heads": 8,
+    "n_layers": 6,
+    "dim_feedforward": 512,
+    "dropout": 0.1,
+    "max_neighbors": 80,
+    "min_energy": 1450.0,
+    "max_energy": 1850.0
+  },
+
+  "cutoff": 20.0,
+  "max_neighbors": 80,
+  "gamma": 10.0,
+  "omega_min": 1500.0,
+  "omega_max": 1750.0,
+  "omega_step": 1.0,
+
+  "use_cuda": true,
+  "use_atomistic": true,
+  "max_plots": 9,
+  "batch_size": 64,
+  "max_frames": null
+}
