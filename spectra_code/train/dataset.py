@@ -6,9 +6,9 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 import numpy as np
 from typing import Dict, List, Tuple
-from data_utils import organize_by_frames, extract_ground_truth_data, extract_predicted_data
-from features import extract_features_for_frame
-from physics import (
+from .data_utils import organize_by_frames, extract_ground_truth_data, extract_predicted_data
+from .features import extract_features_for_frame
+from .physics import (
     calculate_torii_dipole_batch_numpy,
     calculate_tasumi_coupling_numpy,
     generate_spectrum_numpy

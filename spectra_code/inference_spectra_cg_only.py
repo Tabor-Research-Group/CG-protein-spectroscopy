@@ -24,19 +24,20 @@ from pathlib import Path
 from typing import Dict, List
 from tqdm import tqdm
 
-# Import from main codebase - SAME as training
+# Import from main codebase 
 from train.model_fixed import create_model_constrained as create_model
-from train.dataset import SpectrumDataset, collate_fn_pad
-from train.data_utils import load_pkl_data, organize_by_frames, filter_frames_by_quality
+from train.dataset import SpectrumDataset
+from train.data_utils import load_pkl_data, organize_by_frames, filter_frames_by_quality, extract_predicted_data
+from train.features import extract_features_for_frame
 from torch.utils.data import DataLoader
 
-# Import physics functions - SAME as training
+# Import physics functions 
 from train.physics import (
     calculate_torii_dipole_batch_torch,
     batch_generate_spectra_torch
 )
 
-# Import the SAME coupling function as training
+# Import coupling function 
 from train.train_optimized import calculate_tasumi_coupling_batch_torch
 
 # Publication-quality plotting
@@ -49,6 +50,106 @@ plt.rcParams['ytick.labelsize'] = 11
 plt.rcParams['legend.fontsize'] = 11
 plt.rcParams['figure.titlesize'] = 18
 
+
+class InferenceDataset(SpectrumDataset):
+    def __getitem__(self, idx: int) -> Dict[str, torch.Tensor]:
+        """
+        Get one frame's data.
+        
+        Returns:
+            Dictionary with:
+                - own_features: [N, F_own]
+                - neighbor_features: [N, K, F_neighbor]
+                - neighbor_mask: [N, K]
+                - C_positions_pred: [N, 3] predicted carbon positions
+                - O_positions_pred: [N, 3] predicted oxygen positions
+                - N_positions_pred: [N, 3] predicted nitrogen positions
+        """
+        frame_idx = self.frame_indices[idx]
+        frame_oscillators = self.frames_dict[frame_idx]
+        
+        # Extract predicted data (for model input)
+        pred_data = extract_predicted_data(frame_oscillators)
+        
+        # Extract features
+        features = extract_features_for_frame(pred_data, self.cutoff, self.max_neighbors)
+        
+        # Convert to tensors
+        return {
+            'own_features': torch.from_numpy(features['own_features']).float(),
+            'neighbor_features': torch.from_numpy(features['neighbor_features']).float(),
+            'neighbor_mask': torch.from_numpy(features['neighbor_mask']).float(),
+            'C_positions_pred': torch.from_numpy(pred_data['C_positions']).float(),
+            'O_positions_pred': torch.from_numpy(pred_data['O_positions']).float(),
+            'N_positions_pred': torch.from_numpy(pred_data['N_positions']).float(),
+            'frame_idx': frame_idx,
+        }
+
+def collate_fn_inference(batch: List[Dict]) -> Dict[str, torch.Tensor]:
+    """
+    Collate function to handle variable number of oscillators per frame.
+
+    Pads to max oscillators in batch.
+    """
+    # Find max number of oscillators in batch
+    max_N = max(sample['own_features'].shape[0] for sample in batch)
+    max_K = batch[0]['neighbor_features'].shape[1]  # Should be same for all
+    F_own = batch[0]['own_features'].shape[1]
+    F_neighbor = batch[0]['neighbor_features'].shape[2]
+
+    B = len(batch)
+
+    # Initialize padded tensors
+    # IMPORTANT: Place padded atoms far away (z=1000 Å) so coupling J ∝ 1/r³ → 0
+    # BUT: C, O, N must be at DIFFERENT positions to avoid degenerate dipoles
+    own_features = torch.zeros(B, max_N, F_own)
+    neighbor_features = torch.zeros(B, max_N, max_K, F_neighbor)
+    neighbor_mask = torch.zeros(B, max_N, max_K)
+
+    # Place C, O, N at different positions to form a valid (but far away) amide group
+    # C at (0, 0, 1000), O at (1.2, 0, 1000), N at (0, 1.3, 1000)
+    # These form realistic C=O and C-N bond lengths (~1.2-1.3 Å)
+    C_positions_pred = torch.zeros(B, max_N, 3)
+    C_positions_pred[:, :, 2] = 1000.0  # C at z=1000
+
+    O_positions_pred = torch.zeros(B, max_N, 3)
+    O_positions_pred[:, :, 0] = 1.2   # O offset in x
+    O_positions_pred[:, :, 2] = 1000.0  # O at z=1000
+
+    N_positions_pred = torch.zeros(B, max_N, 3)
+    N_positions_pred[:, :, 1] = 1.3   # N offset in y
+    N_positions_pred[:, :, 2] = 1000.0  # N at z=1000
+
+    # Oscillator mask (for loss calculation)
+    oscillator_mask = torch.zeros(B, max_N)
+
+    frame_indices = []
+
+    # Fill in data
+    for i, sample in enumerate(batch):
+        N = sample['own_features'].shape[0]
+
+        own_features[i, :N] = sample['own_features']
+        neighbor_features[i, :N] = sample['neighbor_features']
+        neighbor_mask[i, :N] = sample['neighbor_mask']
+        C_positions_pred[i, :N] = sample['C_positions_pred']
+        O_positions_pred[i, :N] = sample['O_positions_pred']
+        N_positions_pred[i, :N] = sample['N_positions_pred']
+
+        oscillator_mask[i, :N] = 1.0
+
+        frame_indices.append(sample['frame_idx'])
+
+    return {
+        'own_features': own_features,
+        'neighbor_features': neighbor_features,
+        'neighbor_mask': neighbor_mask,
+        'C_positions_pred': C_positions_pred,
+        'O_positions_pred': O_positions_pred,
+        'N_positions_pred': N_positions_pred,
+        'oscillator_mask': oscillator_mask,
+        'frame_indices': frame_indices,
+    }
 
 def inference_on_dataloader(
     model: torch.nn.Module,
@@ -84,11 +185,9 @@ def inference_on_dataloader(
             own_features = batch['own_features'].to(device)
             neighbor_features = batch['neighbor_features'].to(device)
             neighbor_mask = batch['neighbor_mask'].to(device)
-            H_diag_true = batch['H_diag_true'].to(device)
             C_positions_pred = batch['C_positions_pred'].to(device)
             O_positions_pred = batch['O_positions_pred'].to(device)
             N_positions_pred = batch['N_positions_pred'].to(device)
-            spectrum_true = batch['spectrum_true'].to(device)
             oscillator_mask = batch['oscillator_mask'].to(device)
             frame_indices = batch['frame_indices']
 
@@ -100,16 +199,10 @@ def inference_on_dataloader(
                 C_positions_pred, O_positions_pred, N_positions_pred
             )
 
-            # Calculate dipoles for ground truth - SAME as training
-            dipoles_true = batch['dipoles_true'].to(device)
-
             # Calculate couplings for predicted - SAME as training (WITH MASK!)
             J_matrix_pred = calculate_tasumi_coupling_batch_torch(
                 dipoles_pred, C_positions_pred, oscillator_mask
             )
-
-            # Get ground truth coupling matrix (already calculated in dataset)
-            J_matrix_true = batch['J_matrix_true'].to(device)
 
             # Generate IR spectrum - SAME as training (WITH MASK!)
             spectrum_pred = batch_generate_spectra_torch(
@@ -131,13 +224,9 @@ def inference_on_dataloader(
                 result = {
                     'frame_idx': frame_indices[i],
                     'H_diag_pred': H_diag_pred[i, :n_valid].cpu().numpy(),
-                    'H_diag_true': H_diag_true[i, :n_valid].cpu().numpy(),
                     'J_matrix_pred': J_matrix_pred[i, :n_valid, :n_valid].cpu().numpy(),
-                    'J_matrix_true': J_matrix_true[i, :n_valid, :n_valid].cpu().numpy(),
                     'spectrum_pred': spectrum_pred[i].cpu().numpy(),
-                    'spectrum_true': spectrum_true[i].cpu().numpy(),
                     'dipoles_pred': dipoles_pred[i, :n_valid].cpu().numpy(),
-                    'dipoles_true': dipoles_true[i, :n_valid].cpu().numpy(),
                     'omega_grid': omega_grid,
                 }
                 results.append(result)
@@ -211,37 +300,6 @@ def save_results(results: List[Dict], output_dir: Path):
             f.write(line + "\n")
     print(f"  ✓ Saved hamiltonians_predicted.dat (NISE-compatible upper triangular format)")
 
-    # Save Ground Truth Full Hamiltonian matrices (H_diag + J_matrix)
-    # Format: NISE-compatible upper triangular (row by row: diagonal + upper triangle)
-    with open(output_dir / 'hamiltonians_groundtruth.dat', 'w') as f:
-        for result in results:
-            frame_idx = result['frame_idx']
-            H_true = result['H_diag_true']
-
-            # Build full Hamiltonian matrix: H = diag(H_diag) + J_matrix
-            N = len(H_true)
-            H_full = np.diag(H_true)
-
-            # Add coupling matrix for ground truth
-            if 'J_matrix_true' in result:
-                H_full += result['J_matrix_true']
-
-            # Flatten in NISE format: row by row, each row contains diagonal + upper triangle
-            # Row 0: H[0,0], H[0,1], H[0,2], ..., H[0,N-1]
-            # Row 1: H[1,1], H[1,2], ..., H[1,N-1]
-            # Row 2: H[2,2], H[2,3], ..., H[2,N-1]
-            # etc.
-            hamiltonian_values = []
-            for i in range(N):
-                hamiltonian_values.append(H_full[i, i])  # Diagonal element
-                hamiltonian_values.extend(H_full[i, i+1:])  # Upper triangle elements
-
-            line = f"{frame_idx}"
-            for val in hamiltonian_values:
-                line += f" {val:.6f}"
-            f.write(line + "\n")
-    print(f"  ✓ Saved hamiltonians_groundtruth.dat (NISE-compatible upper triangular format)")
-
     # Save Predicted Dipoles (x, y, z components)
     with open(output_dir / 'dipoles_predicted.dat', 'w') as f:
         for result in results:
@@ -267,42 +325,16 @@ def save_results(results: List[Dict], output_dir: Path):
             f.write(line + "\n")
     print(f"  ✓ Saved dipoles_predicted.dat (frame_number x-components y-components z-components)")
 
-    # Save Ground Truth Dipoles (x, y, z components)
-    with open(output_dir / 'dipoles_groundtruth.dat', 'w') as f:
-        for result in results:
-            frame_idx = result['frame_idx']
-            dipoles = result['dipoles_true']  # Shape: (N_oscillators, 3)
-            N = len(dipoles)
-
-            # Write frame number, then all x-components, then all y-components, then all z-components
-            line = f"{frame_idx}"
-
-            # All x-components
-            for i in range(N):
-                line += f" {dipoles[i, 0]:.6f}"
-
-            # All y-components
-            for i in range(N):
-                line += f" {dipoles[i, 1]:.6f}"
-
-            # All z-components
-            for i in range(N):
-                line += f" {dipoles[i, 2]:.6f}"
-
-            f.write(line + "\n")
-    print(f"  ✓ Saved dipoles_groundtruth.dat (frame_number x-components y-components z-components)")
-
     # Save spectra
     with open(output_dir / 'spectra.dat', 'w') as f:
-        f.write("# Frame_Number Frequency_(cm-1) Intensity_Predicted Intensity_True\n")
+        f.write("# Frame_Number Frequency_(cm-1) Intensity_Predicted\n")
         for result in results:
             frame_idx = result['frame_idx']
             omega = result['omega_grid']
             spec_pred = result['spectrum_pred']
-            spec_true = result['spectrum_true']
 
-            for freq, int_pred, int_true in zip(omega, spec_pred, spec_true):
-                f.write(f"{frame_idx} {freq:.2f} {int_pred:.6f} {int_true:.6f}\n")
+            for freq, int_pred in zip(omega, spec_pred):
+                f.write(f"{frame_idx} {freq:.2f} {int_pred:.6f}\n")
     print(f"  ✓ Saved spectra.dat")
 
 
@@ -324,31 +356,25 @@ def plot_spectra_comparison(results: List[Dict], output_dir: Path, max_plots: in
 
         omega = result['omega_grid']
         spec_pred = result['spectrum_pred']
-        spec_true = result['spectrum_true']
         frame_idx = result['frame_idx']
 
         # Plot - updated labels
-        ax.plot(omega, spec_true, 'k-', linewidth=2, label='Atomistic', alpha=0.7)
         ax.plot(omega, spec_pred, 'r--', linewidth=2, label='CG')
-
-        # Calculate correlation
-        corr = np.corrcoef(spec_pred, spec_true)[0, 1]
 
         ax.set_xlabel('Frequency (cm⁻¹)', fontweight='bold')
         ax.set_ylabel('Normalized Intensity', fontweight='bold')
-        ax.set_title(f'Frame {frame_idx} (r = {corr:.3f})', fontweight='bold')
+        ax.set_title(f'Frame {frame_idx}', fontweight='bold')
         ax.set_xlim(1500, 1750)
         ax.set_ylim(0, 1.05)
-        ax.legend(loc='upper left', frameon=False)  # Changed to upper left
 
     # Hide unused subplots
     for idx in range(n_plots, len(axes)):
         axes[idx].axis('off')
 
     plt.tight_layout()
-    plt.savefig(output_dir / 'spectra_comparison.png', dpi=300, bbox_inches='tight')
+    plt.savefig(output_dir / 'spectra.png', dpi=300, bbox_inches='tight')
     plt.close()
-    print(f"  ✓ Saved spectra_comparison.png")
+    print(f"  ✓ Saved spectra.png")
 
 
 def main():
@@ -396,7 +422,7 @@ def main():
     print(f"  Parameters: {sum(p.numel() for p in model.parameters()):,}")
     print(f"  Energy scaling: [{model.output_head.min_energy:.1f}, {model.output_head.max_energy:.1f}] cm⁻¹")
 
-    # Load data and create dataset - SAME AS TRAINING
+    # Load data and create dataset
     print("\nLoading data...")
     pkl_data = load_pkl_data(config['data_path'])
     frames_dict = organize_by_frames(pkl_data)
@@ -408,8 +434,8 @@ def main():
 
     print(f"✓ Selected {len(frame_indices)} frames for inference")
 
-    # Create dataset - SAME AS TRAINING
-    dataset = SpectrumDataset(
+    # Create dataset
+    dataset = InferenceDataset(
         pkl_data=pkl_data,
         frame_indices=frame_indices,
         cutoff=config['cutoff'],
@@ -420,13 +446,13 @@ def main():
         gamma=config['gamma']
     )
 
-    # Create dataloader with SAME collate_fn as training
+    # Create dataloader
     data_loader = DataLoader(
         dataset,
         batch_size=config.get('batch_size', 4),  # Can adjust batch size for inference
         shuffle=False,
         num_workers=config.get('num_workers', 0),  # Multiprocessing for data loading
-        collate_fn=collate_fn_pad  # CRITICAL: Same padding as training!
+        collate_fn=collate_fn_inference  # CRITICAL: Same padding as training!
     )
 
     print(f"✓ Created dataloader with {len(data_loader)} batches")
@@ -455,25 +481,6 @@ def main():
     print("\n" + "="*80)
     print("SUMMARY STATISTICS")
     print("="*80)
-
-    # Compute overall metrics
-    all_corrs = [np.corrcoef(r['spectrum_pred'], r['spectrum_true'])[0, 1] for r in results]
-    all_mse = [np.mean((r['spectrum_pred'] - r['spectrum_true'])**2) for r in results]
-    all_h_mae = [np.mean(np.abs(r['H_diag_pred'] - r['H_diag_true'])) for r in results]
-
-    print(f"\nSpectrum Correlation:")
-    print(f"  Mean: {np.mean(all_corrs):.4f}")
-    print(f"  Std:  {np.std(all_corrs):.4f}")
-    print(f"  Min:  {np.min(all_corrs):.4f}")
-    print(f"  Max:  {np.max(all_corrs):.4f}")
-
-    print(f"\nSpectrum MSE:")
-    print(f"  Mean: {np.mean(all_mse):.6f}")
-    print(f"  Std:  {np.std(all_mse):.6f}")
-
-    print(f"\nSite Energy MAE:")
-    print(f"  Mean: {np.mean(all_h_mae):.2f} cm⁻¹")
-    print(f"  Std:  {np.std(all_h_mae):.2f} cm⁻¹")
 
     print("\n" + "="*80)
     print("INFERENCE COMPLETE!")

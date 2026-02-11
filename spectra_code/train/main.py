@@ -15,14 +15,14 @@ from pathlib import Path
 import warnings
 warnings.filterwarnings('ignore')
 
-from data_utils import load_pkl_data, print_data_summary, organize_by_frames, filter_frames_by_quality
-from data_utils_lazy import load_pkl_sampled, estimate_memory_usage
-from clustering import generate_and_cluster_spectra, plot_cluster_summary
-from dataset import create_dataloaders
-from model import create_model
-from model_fixed import create_model_constrained  # NEW: Fixed model with output constraints
-from train_optimized import SpectrumLoss, train_one_epoch, evaluate, save_checkpoint
-from evaluate import (
+from .data_utils import load_pkl_data, print_data_summary, organize_by_frames, filter_frames_by_quality
+from .data_utils_lazy import load_pkl_sampled, estimate_memory_usage
+from .clustering import generate_and_cluster_spectra, plot_cluster_summary
+from .dataset import create_dataloaders
+from .model import create_model
+from .model_fixed import create_model_constrained  # NEW: Fixed model with output constraints
+from .train_optimized import SpectrumLoss, train_one_epoch, evaluate, save_checkpoint
+from .evaluate import (
     plot_training_curves,
     plot_spectra_comparison,
     plot_site_energy_comparison,
@@ -30,9 +30,9 @@ from evaluate import (
     plot_average_spectrum,
     save_metrics_summary
 )
-from plot_frame_comparison import plot_individual_frames_detailed, plot_spectra_grid_comparison
-from feature_importance import run_all_analyses
-from extended_plots import generate_all_extended_plots
+from .plot_frame_comparison import plot_individual_frames_detailed, plot_spectra_grid_comparison
+from .feature_importance import run_all_analyses
+from .extended_plots import generate_all_extended_plots
 
 
 def parse_args():

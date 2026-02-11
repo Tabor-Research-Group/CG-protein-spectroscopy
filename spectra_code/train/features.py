@@ -12,6 +12,7 @@ import numpy as np
 import torch
 from typing import Tuple, Dict, List
 from scipy.spatial.transform import Rotation
+from .data_utils import get_secondary_structure_from_rama
 
 
 def build_local_frame(C: np.ndarray, O: np.ndarray, N: np.ndarray) -> np.ndarray:
@@ -194,7 +195,6 @@ def extract_features_for_oscillator(
         rama_sin_cos[2*i + 1] = np.cos(angle_rad)
 
     # Secondary structure (one-hot, 4 types)
-    from data_utils import get_secondary_structure_from_rama
     ss_own = get_secondary_structure_from_rama(rama_own[0], rama_own[3])
     ss_onehot = np.zeros(4, dtype=np.float32)
     ss_onehot[ss_own] = 1.0

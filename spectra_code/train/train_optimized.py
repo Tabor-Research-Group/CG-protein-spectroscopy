@@ -24,7 +24,7 @@ import numpy as np
 from typing import Dict, List, Tuple
 from pathlib import Path
 from tqdm import tqdm
-from physics import (
+from .physics import (
     calculate_torii_dipole_batch_torch,
     batch_generate_spectra_torch
 )
