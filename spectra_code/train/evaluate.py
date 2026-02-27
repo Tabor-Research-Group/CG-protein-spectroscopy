@@ -9,6 +9,11 @@ matplotlib.use('Agg')  # Non-interactive backend
 from typing import Dict, List
 from pathlib import Path
 
+from .dataset import create_dataloaders
+from .train_optimized import evaluate, SpectrumLoss
+import torch
+from .plot_frame_comparison import plot_individual_frames_detailed
+
 
 def plot_training_curves(
     history: Dict[str, List],
@@ -403,9 +408,6 @@ def evaluate_protein_file(
     Returns:
         results: Dictionary with metrics
     """
-    from dataset import create_dataloaders
-    from train_optimized import evaluate
-    import torch
 
     model.eval()
 
@@ -428,7 +430,6 @@ def evaluate_protein_file(
     omega_grid_tensor = torch.from_numpy(omega_grid).float().to(device)
 
     # Create a simple criterion for evaluation using config values
-    from train_optimized import SpectrumLoss
     criterion = SpectrumLoss(
         lambda_peak=config.get('lambda_peak', 0.5),
         lambda_correlation=config.get('lambda_correlation', 0.3),
@@ -458,8 +459,6 @@ def evaluate_protein_file(
         )
 
     # Generate sample frame plots
-    from plot_frame_comparison import plot_individual_frames_detailed
-
     if sample_results and len(sample_results) > 0:
         frame_details_dir = output_dir / 'frame_details'
         frame_details_dir.mkdir(exist_ok=True)

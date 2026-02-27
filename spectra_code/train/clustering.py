@@ -8,8 +8,12 @@ import numpy as np
 from typing import List, Tuple, Dict
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
+import matplotlib.pyplot as plt
 import warnings
 warnings.filterwarnings('ignore')
+
+from .physics import calculate_torii_dipole_batch_numpy, calculate_tasumi_coupling_numpy, generate_spectrum_numpy
+from .data_utils import extract_ground_truth_data
 
 
 def extract_spectral_features(spectrum: np.ndarray, omega_grid: np.ndarray) -> np.ndarray:
@@ -182,12 +186,7 @@ def generate_and_cluster_spectra(
         all_spectra: [N_frames, M] all spectra (for visualization)
         omega_grid: [M] frequency grid
     """
-    from physics import (
-        calculate_torii_dipole_batch_numpy,
-        calculate_tasumi_coupling_numpy,
-        generate_spectrum_numpy
-    )
-    from data_utils import extract_ground_truth_data
+
 
     frame_indices = sorted(frames_dict.keys())
     print(f"\nGenerating ground truth spectra for {len(frame_indices)} frames...")
@@ -253,7 +252,6 @@ def plot_cluster_summary(
         sampled_indices: [K] sampled frame indices
         save_path: Output path
     """
-    import matplotlib.pyplot as plt
 
     unique_labels = np.unique(labels)
     n_clusters = len(unique_labels)

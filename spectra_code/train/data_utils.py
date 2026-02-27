@@ -12,6 +12,7 @@ import pickle
 import numpy as np
 from typing import Dict, List, Tuple, Optional
 from pathlib import Path
+from collections import defaultdict
 
 
 def load_pkl_data(pkl_path: str) -> Dict:
@@ -33,7 +34,6 @@ def load_pkl_from_directory(directory: str, verbose: bool = True) -> Tuple[Dict,
         merged_data: Combined data from all files {amino_acid_type: [oscillators]}
         file_mapping: Mapping of {protein_id: file_path} for per-protein evaluation
     """
-    from collections import defaultdict
 
     dir_path = Path(directory)
     if not dir_path.exists():

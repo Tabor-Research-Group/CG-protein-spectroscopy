@@ -15,6 +15,7 @@ Rationale:
 - Both naturally similar magnitude for normalized spectra (no complex balancing needed)
 """
 
+import random
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -600,7 +601,6 @@ def evaluate(
 
     # Random sample for plotting (limit to 50 frames for efficiency)
     if len(sample_results) > 50:
-        import random
         random.seed(42)  # Reproducible sampling
         sample_results = random.sample(sample_results, 50)
 
