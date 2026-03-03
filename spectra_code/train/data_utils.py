@@ -340,11 +340,13 @@ def extract_predicted_data(frame_oscillators: List[Dict]) -> Dict:
         # Rama angles (from predicted_rama_nnfs)
         if 'predicted_rama_nnfs' in osc:
             rama = osc['predicted_rama_nnfs']
-            rama_angles[i, 0] = rama.get('phi_N', 0.0) or 0.0
-            rama_angles[i, 1] = rama.get('psi_N', 0.0) or 0.0
-            rama_angles[i, 2] = rama.get('phi_C', 0.0) or 0.0
-            rama_angles[i, 3] = rama.get('psi_C', 0.0) or 0.0
+            rama_angles[i, 0] = rama.get('phi_N', 0.0)
+            rama_angles[i, 1] = rama.get('psi_N', 0.0)
+            rama_angles[i, 2] = rama.get('phi_C', 0.0)
+            rama_angles[i, 3] = rama.get('psi_C', 0.0)
 
+    rama_angles = np.nan_to_num(rama_angles)
+    
     return {
         'C_positions': C_positions,
         'O_positions': O_positions,
