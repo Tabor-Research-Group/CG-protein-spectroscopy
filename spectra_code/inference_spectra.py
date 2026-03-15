@@ -400,7 +400,8 @@ def main():
     print("\nLoading data...")
     pkl_data = load_pkl_data(config['data_path'])
     frames_dict = organize_by_frames(pkl_data)
-    frames_dict, _, _ = filter_frames_by_quality(frames_dict, verbose=True)
+    if config.get('filter_frames', False):
+        frames_dict, _, _ = filter_frames_by_quality(frames_dict, verbose=True)
 
     all_frame_indices = sorted(frames_dict.keys())
     max_frames = config.get('max_frames', len(all_frame_indices))
