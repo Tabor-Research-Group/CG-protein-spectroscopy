@@ -51,15 +51,20 @@ sys.path.insert(0, str(_PROJECT_ROOT))
 from backmap.config import Config
 from backmap.data.collate import collate_graph_samples
 from backmap.data.oscillator_dataset import build_default_vocab_from_pickle
+from backmap.data.oscillator_graph import build_graph_from_oscillator
 from backmap.model.diffusion import GaussianDiffusion, make_schedule
 from backmap.model.gnn import BackmapGNN, EdgeCutoffs
 from backmap.model.pipeline import (
     atoms_local_to_global,
+    build_atom_node_mask,
+    build_node_atom_group,
+    build_node_geom_sph,
+    build_node_pos,
     clamp_local_atoms,
 )
 from backmap.utils.checkpoint import load_checkpoint
 from backmap.geometry.frames import compute_residue_local_frames
-
+    
 warnings.filterwarnings("ignore", category=UserWarning)
 
 
@@ -469,13 +474,6 @@ def ddim_sample_atoms(
       x_final_local: [Na,3]
       x_final_global: [Na,3]
     """
-    from backmap.model.pipeline import (
-        build_atom_node_mask,
-        build_node_atom_group,
-        build_node_geom_sph,
-        build_node_pos,
-    )
-
     device = batch["x0_local"].device
     Na = batch["x0_local"].shape[0]
     Nn = int(batch["num_nodes"])
@@ -1040,7 +1038,7 @@ def run_inference_on_oscillators(
                     raise ValueError("Non-finite sidechain anchor")
 
             # Build graph from CG only
-            graph = build_graph_for_inference(
+            graph = build_graph_from_oscillator(
                 osc,
                 vocab=vocab,
                 all_oscillators=oscillators,
@@ -1124,7 +1122,7 @@ def process_trajectory(
     print(f"Using device: {device}")
 
     # Load vocabulary
-    vocab_pkl = config['infer']['vocab_pickle']
+    vocab_pkl = Path(os.path.dirname(__file__)) / 'tiny.pkl'
     print(f"Loading vocabulary from {vocab_pkl}...")
     vocab = build_default_vocab_from_pickle(vocab_pkl)
 

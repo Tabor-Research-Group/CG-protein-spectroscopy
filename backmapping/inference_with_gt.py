@@ -68,9 +68,8 @@ if _BACKMAP_DIR.exists():
 
 from backmap.config import Config
 from backmap.data.collate import collate_graph_samples
-from backmap.data.oscillator_dataset import (
-    build_default_vocab_from_pickle,
-)
+from backmap.data.oscillator_dataset import build_default_vocab_from_pickle
+from backmap.data.oscillator_graph import build_graph_from_oscillator
 from backmap.model.diffusion import GaussianDiffusion, make_schedule
 from backmap.model.gnn import BackmapGNN, EdgeCutoffs
 from backmap.model.pipeline import (
@@ -83,6 +82,7 @@ from backmap.model.pipeline import (
 )
 from backmap.model.sampling import sample_atoms_full
 from backmap.utils.checkpoint import load_checkpoint
+
 
 warnings.filterwarnings("ignore", category=UserWarning)
 
@@ -1233,8 +1233,6 @@ def run_inference_on_oscillators(
     
     for local_idx, osc in enumerate(oscillators):
         try:
-            from backmap.data.oscillator_graph import build_graph_from_oscillator
-
             # Make oscillator safe/complete for prediction (atomistic not required)
             _ensure_atoms_for_inference(osc)
 
@@ -1359,7 +1357,7 @@ def process_trajectory(
     print(f"Using device: {device}")
     
     # Load vocabulary from pickle
-    vocab_pkl = config['infer']['vocab_pickle']
+    vocab_pkl = Path(os.path.dirname(__file__)) / 'tiny.pkl'
     print(f"Loading vocabulary from {vocab_pkl}...")
     vocab = build_default_vocab_from_pickle(vocab_pkl)
     
@@ -1372,13 +1370,27 @@ def process_trajectory(
     protein_folder = Path(config['infer']['protein_folder'])
     
     # Get trajectory files
-    xtc_file = protein_folder / config['infer']['xtc_filename']
-    tpr_file = protein_folder / config['infer']['tpr_filename']
+    extract_atomistic = config['infer'].get('extract_atomistic', False)
+    if extract_atomistic:
+        if 'xtc_filename' in config['infer'].keys():
+            xtc_file = protein_folder / config['infer']['xtc_filename']
+        else:
+            raise FileNotFoundError(f"Missing xtc file for {protein_name}")
+        if not xtc_file.exists():
+            raise FileNotFoundError(f"Missing xtc file for {protein_name}")
+        if 'tpr_filename' in config['infer'].keys():
+            tpr_file = protein_folder / config['infer']['tpr_filename']
+        else:
+            raise FileNotFoundError(f"Missing tpr file for {protein_name}")
+        if not tpr_file.exists():
+            raise FileNotFoundError(f"Missing tpr file for {protein_name}")
+    else:
+        xtc_file = None
+        tpr_file = None
     cg_pdb_pattern = config['infer']['cg_pdb_pattern']
     cg_pdb_file = protein_folder / cg_pdb_pattern.format(folder=protein_name)
-    
-    if not all(p.exists() for p in [xtc_file, tpr_file, cg_pdb_file]):
-        raise FileNotFoundError(f"Missing trajectory files for {protein_name}")
+    if not cg_pdb_file.exists():
+        raise FileNotFoundError(f"Missing CG trajectory file for {protein_name}")
     
     print(f"\nProcessing protein: {protein_name}")
     print(f"  XTC: {xtc_file}")
@@ -1428,7 +1440,6 @@ def process_trajectory(
         start_pos = 0
     
     # Setup atomistic universe if needed
-    extract_atomistic = config['infer'].get('extract_atomistic', False)
     u = None
     if extract_atomistic:
         print("\n✓ Extracting atomistic data (SLOW)")
