@@ -984,23 +984,22 @@ def add_rama_angles_to_oscillators(
 ):
     """Add Ramachandran NNFS angles to all oscillators."""
     backbone_oscs = [o for o in oscillators if o['type'] == 'backbone']
-    
-    if not backbone_oscs:
-        return
-    
-    # Compute φ/ψ
-    phi_by_resid, psi_by_resid, first_resid, last_resid = \
-        compute_phi_psi_from_backbone_oscillators(backbone_oscs, source=source)
-    
-    # Add NNFS angles to each oscillator
-    for osc in oscillators:
-        if osc['type'] == 'backbone':
-            nnfs = compute_nnfs_angles_for_oscillator(osc, phi_by_resid, psi_by_resid)
-        else:
-            # Sidechain oscillators have no NNFS angles
-            nnfs = {'phi_N': None, 'psi_N': None, 'phi_C': None, 'psi_C': None}
+
+    frames = set([osc['frame'] for osc in backbone_oscs])
+    for t in frames:
+        oscs_t = [o for o in backbone_oscs if o['frame'] == t]
         
-        osc[target_field] = nnfs
+        # Compute φ/ψ
+        phi_by_resid, psi_by_resid, first_resid, last_resid = \
+            compute_phi_psi_from_backbone_oscillators(oscs_t, source=source)
+        
+        # Add NNFS angles to each oscillator
+        for osc in oscs_t:
+            osc[target_field] = compute_nnfs_angles_for_oscillator(osc, phi_by_resid, psi_by_resid)
+    
+    sidechain_oscs = [o for o in oscillators if o['type'] != 'backbone']
+    for osc in sidechain_oscs:
+        osc[target_field] = {'phi_N': None, 'psi_N': None, 'phi_C': None, 'psi_C': None}
 
 
 # ============================================================================
