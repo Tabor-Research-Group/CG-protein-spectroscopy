@@ -83,7 +83,7 @@ def extract_from_universe(u):
             CD_pos = CD.positions
             OE1_pos = OE1.positions
             NE2_pos = NE2.positions
-            dipoles = calculate_torii_dipole_batch_numpy(CD_pos, OD1_pos, NE2_pos)
+            dipoles = calculate_torii_dipole_batch_numpy(CD_pos, OE1_pos, NE2_pos)
             for j, res in enumerate(gln_res):
                 i += 1
                 osc = {
