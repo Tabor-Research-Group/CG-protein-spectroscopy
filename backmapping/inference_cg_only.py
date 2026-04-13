@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import argparse
 import pickle
+import os
 import sys
 import time
 import warnings
@@ -1127,6 +1128,8 @@ def process_trajectory(
     vocab = build_default_vocab_from_pickle(vocab_pkl)
 
     # Build model
+    if checkpoint_path == 'best.pt':
+        checkpoint_path = Path(os.path.dirname(__file__)) / 'best.pt'
     print(f"Loading model from {checkpoint_path}...")
     model, diffusion = build_model_and_diffusion(config, vocab, checkpoint_path, device)
 

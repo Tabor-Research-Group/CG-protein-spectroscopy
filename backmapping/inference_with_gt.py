@@ -567,7 +567,7 @@ def select_frame_indices(total_frames_in_traj: int, config_infer: Dict[str, Any]
     if total_frames_in_traj <= 0:
         return [], _compute_selection_hash([])
 
-    if frame_selection not in ('first', 'random', 'all'):
+    if frame_selection not in ('first', 'random', 'all', 'last'):
         raise ValueError(f"infer.frame_selection must be one of ['first','random','all'], got: {frame_selection}")
 
     if max_frames is None or max_frames <= 0:
@@ -581,6 +581,9 @@ def select_frame_indices(total_frames_in_traj: int, config_infer: Dict[str, Any]
     elif frame_selection == 'first':
         print(f'Using first {k} frames')
         frame_indices = list(range(k))
+    elif frame_selection == 'last':
+        print(f'Using last {k} frames')
+        frame_indices = list(range(total_frames_in_traj-k, total_frames_in_traj))
     else:  # random
         rng = random.Random(seed)
         frame_indices = rng.sample(range(total_frames_in_traj), k=k)

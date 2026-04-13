@@ -25,7 +25,7 @@ from typing import Dict, List
 from tqdm import tqdm
 
 # Import from main codebase 
-from train.model_fixed import create_model_constrained as create_model
+from train.model import create_model
 from train.dataset import SpectrumDataset
 from train.data_utils import load_pkl_data, organize_by_frames, filter_frames_by_quality, extract_predicted_data
 from train.features import extract_features_for_frame

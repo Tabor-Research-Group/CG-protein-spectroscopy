@@ -449,7 +449,7 @@ def main():
     print("="*80)
 
     save_results(results, output_dir)
-    plot_spectra_comparison(results, output_dir, max_plots=config.get('max_plots', 9))
+    #plot_spectra_comparison(results, output_dir, max_plots=config.get('max_plots', 9))
     # plot_average_spectrum() removed - not applicable for randomly sampled frames
 
     # Print summary statistics
@@ -458,19 +458,19 @@ def main():
     print("="*80)
 
     # Compute overall metrics
-    all_corrs = [np.corrcoef(r['spectrum_pred'], r['spectrum_true'])[0, 1] for r in results]
-    all_mse = [np.mean((r['spectrum_pred'] - r['spectrum_true'])**2) for r in results]
+    #all_corrs = [np.corrcoef(r['spectrum_pred'], r['spectrum_true'])[0, 1] for r in results]
+    #all_mse = [np.mean((r['spectrum_pred'] - r['spectrum_true'])**2) for r in results]
     all_h_mae = [np.mean(np.abs(r['H_diag_pred'] - r['H_diag_true'])) for r in results]
 
-    print(f"\nSpectrum Correlation:")
-    print(f"  Mean: {np.mean(all_corrs):.4f}")
-    print(f"  Std:  {np.std(all_corrs):.4f}")
-    print(f"  Min:  {np.min(all_corrs):.4f}")
-    print(f"  Max:  {np.max(all_corrs):.4f}")
+    #print(f"\nSpectrum Correlation:")
+    #print(f"  Mean: {np.mean(all_corrs):.4f}")
+    #print(f"  Std:  {np.std(all_corrs):.4f}")
+    #print(f"  Min:  {np.min(all_corrs):.4f}")
+    #print(f"  Max:  {np.max(all_corrs):.4f}")
 
-    print(f"\nSpectrum MSE:")
-    print(f"  Mean: {np.mean(all_mse):.6f}")
-    print(f"  Std:  {np.std(all_mse):.6f}")
+    #print(f"\nSpectrum MSE:")
+    #print(f"  Mean: {np.mean(all_mse):.6f}")
+    #print(f"  Std:  {np.std(all_mse):.6f}")
 
     print(f"\nSite Energy MAE:")
     print(f"  Mean: {np.mean(all_h_mae):.2f} cm⁻¹")
