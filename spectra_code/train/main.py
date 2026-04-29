@@ -11,16 +11,16 @@ import json
 import numpy as np
 import torch
 import torch.optim as optim
+from torch.optim.lr_scheduler import LambdaLR
 from pathlib import Path
 import warnings
 warnings.filterwarnings('ignore')
 
-from .data_utils import load_pkl_data, print_data_summary, organize_by_frames, filter_frames_by_quality
+from .data_utils import load_pkl_data, print_data_summary, organize_by_frames, filter_frames_by_quality, load_pkl_from_directory, load_individual_files_from_directory, extract_ground_truth_data, filter_frames_by_quality
 from .data_utils_lazy import load_pkl_sampled, estimate_memory_usage
 from .clustering import generate_and_cluster_spectra, plot_cluster_summary
 from .dataset import create_dataloaders
 from .model import create_model
-from .model_fixed import create_model_constrained  # NEW: Fixed model with output constraints
 from .train_optimized import SpectrumLoss, train_one_epoch, evaluate, save_checkpoint
 from .evaluate import (
     plot_training_curves,
@@ -135,8 +135,6 @@ def main():
     test_files_data = None
 
     if args.train_dir:
-        from data_utils import load_pkl_from_directory, load_individual_files_from_directory
-
         # Use memory-efficient loading if frames_per_file is specified
         if args.frames_per_file is not None:
             print(f"\n⚠️  Memory-efficient mode: sampling {args.frames_per_file} frames per file")
@@ -153,8 +151,6 @@ def main():
         raise ValueError("Must specify either --train_dir or --train_pkl")
 
     if args.val_dir:
-        from data_utils import load_pkl_from_directory, load_individual_files_from_directory
-
         # Use memory-efficient loading if frames_per_file is specified
         if args.frames_per_file is not None:
             test_data, val_file_mapping = load_pkl_sampled(
@@ -168,7 +164,6 @@ def main():
         if args.per_protein_eval:
             val_files_data = load_individual_files_from_directory(args.val_dir)
     elif args.test_dir:
-        from data_utils import load_pkl_from_directory, load_individual_files_from_directory
         test_data, test_file_mapping = load_pkl_from_directory(args.test_dir)
         # Load individual files for per-protein evaluation
         if args.per_protein_eval:
@@ -189,7 +184,6 @@ def main():
     print("="*80)
     print("FILTERING FRAMES BY QUALITY")
     print("="*80)
-    from data_utils import filter_frames_by_quality
 
     train_frames_dict, train_excluded, train_stats = filter_frames_by_quality(
         train_frames_dict, min_bond=0.8, max_bond=2.0, verbose=True
@@ -267,7 +261,6 @@ def main():
     print("GROUND TRUTH SITE ENERGY ANALYSIS")
     print("="*80)
 
-    from data_utils import extract_ground_truth_data
     all_train_energies = []
     all_test_energies = []
 
@@ -313,7 +306,7 @@ def main():
     }
 
     # Use fixed model with constrained output to prevent eigenvalue decomposition failures
-    model = create_model_constrained(model_config).to(device)
+    model = create_model(model_config).to(device)
 
     n_params = sum(p.numel() for p in model.parameters())
     n_trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -359,7 +352,6 @@ def main():
     # CRITICAL FIX: Warmup was causing model to regress to mean predictions
     # First epoch works well, then LR increases → model overshoots → predicts mean
     # Solution: Keep LR constant and low throughout training
-    from torch.optim.lr_scheduler import LambdaLR
 
     steps_per_epoch = len(train_loader)
     total_steps = args.epochs * steps_per_epoch
@@ -395,7 +387,6 @@ def main():
     # Per-protein tracking
     per_protein_history = {}
     if args.track_per_protein and val_files_data:
-        from collections import defaultdict
         for protein_id in val_files_data.keys():
             per_protein_history[protein_id] = defaultdict(list)
         print(f"Per-protein tracking enabled for {len(val_files_data)} proteins")
