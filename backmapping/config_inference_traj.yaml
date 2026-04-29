@@ -8,7 +8,7 @@
 # ============================================================================
 data:
   # Path to pickle file - used ONLY for building vocabulary
-  pickle_path: "/scratch/user/vijay_jeyaraj/spectroscopy-proteins/extracted_pdb_files/CG_backmap_frame/GNN-spherical/backmap_diffusion_production_2_2_3/tiny.pkl"
+  pickle_path: "tiny.pkl"
   
   # Dataset processing (MUST match training!)
   drop_zero_atoms: true
@@ -88,7 +88,7 @@ infer:
   # Protein Settings
   # -------------------------------------------------------------------------
   protein_name: "3fp5_A"
-  protein_folder: "/scratch/user/vijay_jeyaraj/spectroscopy-proteins/extracted_pdb_files/3fp5_A"
+  protein_folder: "/extracted_pdb_files/3fp5_A"
   
   # -------------------------------------------------------------------------
   # Output Settings
@@ -98,10 +98,7 @@ infer:
   # -------------------------------------------------------------------------
   # Trajectory File Names
   # -------------------------------------------------------------------------
-  xtc_filename: "prod_centered.xtc"
-  #  xtc_filename: "prod.xtc"
-  tpr_filename: "prod.tpr"
-  cg_pdb_pattern: "{folder}_CG_protein_only_full_trajectory.pdb"
+  cg_pdb_pattern: "3fp5_A_frames.pdb"
   
   # -------------------------------------------------------------------------
   # Processing Options
@@ -112,10 +109,10 @@ infer:
   frame_range: [0, 5000]    # Used when frame_selection is 'range' [start, end]
   random_seed: 123
   sort_random_frames: true
-  extract_atomistic: true # Extract ground truth (VERY SLOW! Only for validation)
+  extract_atomistic: false # Extract ground truth (VERY SLOW! Only for validation)
 
   hamiltonian_file: diagonal_hamiltonian.txt
-  require_hamiltonians: true
+  require_hamiltonians: false
   strict_hamiltonian_validation: true
   
   # -------------------------------------------------------------------------
@@ -136,7 +133,7 @@ infer:
   # -------------------------------------------------------------------------
   # Vocabulary Source
   # -------------------------------------------------------------------------
-  vocab_pickle: "/scratch/user/vijay_jeyaraj/spectroscopy-proteins/extracted_pdb_files/CG_backmap_frame/GNN-spherical/backmap_diffusion_production_2_2_3/tiny.pkl"
+  vocab_pickle: "tiny.pkl"
   
   # -------------------------------------------------------------------------
   # Parallel Graph Building (not implemented yet)
@@ -144,8 +141,8 @@ infer:
   num_workers: 8          # CPU workers for parallel graph building (0=sequential, 1-16=parallel)
   
 
-  compute_analysis: true                # predicted dipole + predicted rama
-  compute_atomistic_analysis: true      # atomistic dipole + atomistic rama (only if extract_atomistic=true)
+  compute_analysis: true                 # predicted dipole + predicted rama
+  compute_atomistic_analysis: false      # atomistic dipole + atomistic rama (only if extract_atomistic=true)
 # ============================================================================
 # NOTES
 # ============================================================================

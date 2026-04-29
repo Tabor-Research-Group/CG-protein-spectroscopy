@@ -3,9 +3,7 @@
 # Copy this file and edit paths/hyperparameters as needed.
 
 data:
-#  pickle_path: /scratch/user/vijay_jeyaraj/spectroscopy-proteins/extracted_pdb_files/CG_backmap_frame/GNN-spherical/backmap_diffusion_production_2_2_3/tiny.pkl
-  pickle_path: /scratch/user/vijay_jeyaraj/spectroscopy-proteins/extracted_pdb_files/amino_acid_baskets_complete_300.pkl
-#  pickle_path: /scratch/user/vijay_jeyaraj/spectroscopy-proteins/extracted_pdb_files/amino_acid_baskets_complete_new.pkl
+  pickle_path: /extracted_pdb_files/amino_acid_baskets_complete_300.pkl
   drop_zero_atoms: true
   max_sidechain_beads: 4
   fully_connected_edges: true

@@ -1,6 +1,6 @@
 {
   "model_path": "best_model.pt",
-  "data_path": "/scratch/user/vijay_jeyaraj/spectroscopy-proteins/extracted_pdb_files/CG_backmap_frame/GNN-spherical/backmap_diffusion_production_2_2_3/denoise_results_new/3fp5_A.pkl",
+  "data_path": "./denoise_results/3fp5_A.pkl",
   "output_dir": "./3fp5_A_results",
 
   "model_config": {
@@ -24,7 +24,7 @@
   "omega_step": 1.0,
 
   "use_cuda": true,
-  "use_atomistic": true,
+  "use_atomistic": false,
   "max_plots": 9,
   "batch_size": 64,
   "max_frames": null
