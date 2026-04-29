@@ -1,4 +1,5 @@
 import struct
+import argparse
 import numpy as np
 
 # Function to convert text file to binary file
@@ -15,8 +16,15 @@ def convert_to_binary(input_filename, output_filename):
             # Write Hamiltonian entries as 32-bit floats
             output_file.write(hamiltonian_entries.tobytes())
 
-# Example usage
-convert_to_binary('hamiltonians_groundtruth.dat', 'hamiltonians_groundtruth.bin')
-convert_to_binary('hamiltonians_predicted.dat', 'hamiltonians_predicted.bin')
-convert_to_binary('dipoles_groundtruth.dat', 'dipoles_groundtruth.bin')
-convert_to_binary('dipoles_predicted.dat', 'dipoles_predicted.bin')
+def main():
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('filenames', nargs='+')
+    filenames = parser.parse_args().filenames
+    
+    for f in filenames:
+        output = f[:-4] + '.bin'
+        convert_to_binary(f, output)
+
+if __name__ == "__main__":
+    main()
