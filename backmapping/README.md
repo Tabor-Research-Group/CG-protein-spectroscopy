@@ -1,6 +1,6 @@
-# CG-to-Atomistic Backmapping with Diffusion Models
+#  Spectroscopically Motivated, Minimal Backmapping Diffusion Model
 
-A diffusion-based deep learning framework for reconstructing atomistic protein structures from coarse-grained (CG) representations. The model learns to predict peptide backbone oscillator atoms (C=O bonds) and sidechain amide groups from CG bead positions.
+A DDPM for reconstructing atomistic protein configurations from CG representations. The model predicts the protein backbone atoms and side-chain amide groups (for ASN and GLN) from CG bead positions.
 
 ## Overview
 
@@ -10,35 +10,6 @@ This codebase provides:
 3. **Inference** on new CG trajectories
 4. **Validation plotting** for publication-quality figures
 
-## Installation
-
-### Dependencies
-
-```bash
-# Core ML
-pip install torch torchvision
-pip install torch-geometric
-
-# Molecular dynamics
-pip install MDAnalysis
-
-# Scientific computing
-pip install numpy scipy
-
-# Utilities
-pip install pyyaml tqdm matplotlib seaborn
-```
-
-### Setup
-
-Clone and navigate to the repository:
-```bash
-cd backmapping
-```
-
-No installation required - scripts add the package to path automatically.
-
----
 
 ## Quick Start
 
@@ -387,28 +358,3 @@ python plot_backmap_validation.py \
 - Secondary structure Q3 accuracy
 - Clash analysis
 
----
-
-## Model Architecture
-
-The model uses a graph neural network (GNN) with diffusion-based denoising:
-
-- **Input**: Small graphs (~5-20 nodes) per oscillator containing CG beads + noised atom positions
-- **Output**: Predicted atomistic coordinates in residue-local frame
-- **Training**: Forward diffusion adds noise; model learns to denoise
-- **Inference**: DDIM sampling for fast generation (50 steps typical)
-
-Key design choices:
-- SE(3)-equivariant predictions via local coordinate frames
-- Physics-informed losses (bonds, angles, dihedrals, dipoles)
-- Folder-based train/test splits prevent data leakage
-
----
-
-## Citation
-
-If you use this code, please cite the associated publication.
-
-## License
-
-[Add license information]
