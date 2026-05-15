@@ -39,53 +39,62 @@ def parse_args():
     parser = argparse.ArgumentParser(description='Train site energy prediction model')
 
     # Data
-    parser.add_argument('--train_dir', type=str, help='Training data directory (contains *.pkl files)')
-    parser.add_argument('--val_dir', type=str, help='Validation data directory (contains *.pkl files)')
-    parser.add_argument('--test_dir', type=str, help='Test data directory (contains *.pkl files)')
-    parser.add_argument('--train_pkl', type=str, help='Training PKL file (alternative to --train_dir)')
-    parser.add_argument('--test_pkl', type=str, help='Test PKL file (alternative to --val_dir/--test_dir)')
-    parser.add_argument('--output_dir', type=str, default='results/', help='Output directory')
-    parser.add_argument('--per_protein_eval', action='store_true', help='Evaluate each protein individually after training')
+    data_group = parser.add_argument_group('Data Input/Output')
+    data_group.add_argument('--train_dir', type=str, help='Training data directory (contains *.pkl files)')
+    data_group.add_argument('--val_dir', type=str, help='Validation data directory (contains *.pkl files)')
+    data_group.add_argument('--test_dir', type=str, help='Test data directory (contains *.pkl files)')
+    data_group.add_argument('--train_pkl', type=str, help='Training PKL file (alternative to --train_dir)')
+    data_group.add_argument('--test_pkl', type=str, help='Test PKL file (alternative to --val_dir/--test_dir)')
+    data_group.add_argument('--output_dir', type=str, default='results/', help='Output directory')
+    data_group.add_argument('--per_protein_eval', action='store_true', help='Evaluate each protein individually after training')
 
     # Clustering
-    parser.add_argument('--n_clusters', type=int, default=1600, help='Number of clusters')
-    parser.add_argument('--samples_per_cluster', type=int, default=1, help='Samples per cluster')
-    parser.add_argument('--use_all_test_frames', action='store_true', help='Use all test frames (no clustering)')
+    cluster_group = parser.add_argument_group('Sample Clustering')
+    cluster_group.add_argument('--n_clusters', type=int, default=1600, help='Number of clusters')
+    cluster_group.add_argument('--samples_per_cluster', type=int, default=1, help='Samples per cluster')
+    cluster_group.add_argument('--use_all_test_frames', action='store_true', help='Use all test frames (no clustering)')
 
     # Model
-    parser.add_argument('--d_model', type=int, default=128, help='Transformer hidden dimension')
-    parser.add_argument('--n_heads', type=int, default=8, help='Number of attention heads')
-    parser.add_argument('--n_layers', type=int, default=6, help='Number of transformer layers')
-    parser.add_argument('--dim_feedforward', type=int, default=512, help='Feedforward dimension')
-    parser.add_argument('--dropout', type=float, default=0.1, help='Dropout rate')
+    model_group = parser.add_argument_group('Model Architecture')
+    model_group.add_argument('--d_model', type=int, default=128, help='Transformer hidden dimension')
+    model_group.add_argument('--n_heads', type=int, default=8, help='Number of attention heads')
+    model_group.add_argument('--n_layers', type=int, default=6, help='Number of transformer layers')
+    model_group.add_argument('--dim_feedforward', type=int, default=512, help='Feedforward dimension')
+    model_group.add_argument('--dropout', type=float, default=0.1, help='Dropout rate')
 
     # Training
-    parser.add_argument('--epochs', type=int, default=500, help='Number of epochs')
-    parser.add_argument('--batch_size', type=int, default=8, help='Batch size')
-    parser.add_argument('--lr', type=float, default=5e-5, help='Learning rate (constant, very low to prevent overshooting)')
-    parser.add_argument('--weight_decay', type=float, default=1e-5, help='Weight decay')
-    parser.add_argument('--num_workers', type=int, default=4, help='Number of data loading workers')
+    training_group = parser.add_argument_group('Training Parameters')
+    training_group.add_argument('--epochs', type=int, default=500, help='Number of epochs')
+    training_group.add_argument('--batch_size', type=int, default=8, help='Batch size')
+    training_group.add_argument('--lr', type=float, default=5e-5, help='Learning rate (constant, very low to prevent overshooting)')
+    training_group.add_argument('--weight_decay', type=float, default=1e-5, help='Weight decay')
+    training_group.add_argument('--num_workers', type=int, default=4, help='Number of data loading workers')
 
     # Loss (multi-component spectrum loss)
-    parser.add_argument('--lambda_peak', type=float, default=0.5, help='Peak position loss weight')
-    parser.add_argument('--lambda_correlation', type=float, default=0.3, help='Correlation loss weight')
+    loss_group = parser.add_argument_group('Loss Function Parameters')
+    loss_group.add_argument('--lambda_peak', type=float, default=0.5, help='Peak position loss weight')
+    loss_group.add_argument('--lambda_correlation', type=float, default=0.3, help='Correlation loss weight')
 
     # Physics
-    parser.add_argument('--cutoff', type=float, default=20.0, help='Neighbor cutoff (Angstroms)')
-    parser.add_argument('--max_neighbors', type=int, default=80, help='Max neighbors per oscillator')
-    parser.add_argument('--gamma', type=float, default=10.0, help='Lorentzian width (cm^-1)')
+    physics_group = parser.add_argument_group('Physics-Based Parameters')
+    physics_group.add_argument('--cutoff', type=float, default=20.0, help='Neighbor cutoff (Angstroms)')
+    physics_group.add_argument('--max_neighbors', type=int, default=80, help='Max neighbors per oscillator')
+    physics_group.add_argument('--gamma', type=float, default=10.0, help='Lorentzian width (cm^-1)')
 
     # Early stopping
-    parser.add_argument('--early_stopping', action='store_true', help='Enable early stopping')
-    parser.add_argument('--patience', type=int, default=100, help='Early stopping patience (epochs)')
-    parser.add_argument('--min_delta', type=float, default=0.001, help='Minimum improvement for early stopping')
+    es_group = parser.add_argument_group('Early Stopping Parameters')
+    es_group.add_argument('--early_stopping', action='store_true', help='Enable early stopping')
+    es_group.add_argument('--patience', type=int, default=100, help='Early stopping patience (epochs)')
+    es_group.add_argument('--min_delta', type=float, default=0.001, help='Minimum improvement for early stopping')
 
     # Per-protein tracking
-    parser.add_argument('--track_per_protein', action='store_true', help='Track per-protein metrics during training')
-    parser.add_argument('--plot_interval', type=int, default=10, help='Interval for updating tracking plots (epochs)')
+    tracking_group = parser.add_argument_group('Per-Protein Metric Settings')
+    tracking_group.add_argument('--track_per_protein', action='store_true', help='Track per-protein metrics during training')
+    tracking_group.add_argument('--plot_interval', type=int, default=10, help='Interval for updating tracking plots (epochs)')
 
     # Memory efficiency
-    parser.add_argument('--frames_per_file', type=int, default=None,
+    mem_group = parser.add_argument_group('Memory Efficiency')
+    mem_group.add_argument('--frames_per_file', type=int, default=None,
                         help='Sample N frames per file (for low-memory systems). If None, loads all frames.')
 
     # Misc
