@@ -48,7 +48,7 @@ def parse_args():
     parser.add_argument('--per_protein_eval', action='store_true', help='Evaluate each protein individually after training')
 
     # Clustering
-    parser.add_argument('--n_clusters', type=int, default=50, help='Number of clusters')
+    parser.add_argument('--n_clusters', type=int, default=1600, help='Number of clusters')
     parser.add_argument('--samples_per_cluster', type=int, default=1, help='Samples per cluster')
     parser.add_argument('--use_all_test_frames', action='store_true', help='Use all test frames (no clustering)')
 
@@ -60,9 +60,9 @@ def parse_args():
     parser.add_argument('--dropout', type=float, default=0.1, help='Dropout rate')
 
     # Training
-    parser.add_argument('--epochs', type=int, default=100, help='Number of epochs')
+    parser.add_argument('--epochs', type=int, default=500, help='Number of epochs')
     parser.add_argument('--batch_size', type=int, default=8, help='Batch size')
-    parser.add_argument('--lr', type=float, default=1e-7, help='Learning rate (constant, very low to prevent overshooting)')
+    parser.add_argument('--lr', type=float, default=5e-5, help='Learning rate (constant, very low to prevent overshooting)')
     parser.add_argument('--weight_decay', type=float, default=1e-5, help='Weight decay')
     parser.add_argument('--num_workers', type=int, default=4, help='Number of data loading workers')
 

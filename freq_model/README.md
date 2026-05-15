@@ -89,9 +89,9 @@ python train/main.py \
     --train_dir /path/to/train/ \
     --test_dir /path/to/test/ \
     --output_dir ./checkpoints/ \
-    --epochs 100 \
+    --epochs 500 \
     --batch_size 8 \
-    --lr 1e-7 \
+    --lr 5e-5 \
     --d_model 128 \
     --n_heads 8 \
     --n_layers 6 \
@@ -99,7 +99,7 @@ python train/main.py \
     --dropout 0.1 \
     --cutoff 20.0 \
     --gamma 10.0 \
-    --n_clusters 50 \
+    --n_clusters 1600 \
     --samples_per_cluster 1
 ```
 
@@ -107,15 +107,16 @@ python train/main.py \
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `--epochs` | 100 | Number of training epochs |
+| `--epochs` | 500 | Number of training epochs |
 | `--batch_size` | 8 | Batch size (frames per batch) |
-| `--lr` | 1e-7 | Learning rate |
+| `--lr` | 5e-5 | Learning rate |
 | `--d_model` | 128 | Transformer hidden dimension |
 | `--n_heads` | 8 | Number of attention heads |
 | `--n_layers` | 6 | Number of transformer layers |
 | `--cutoff` | 20.0 | Neighbor cutoff distance (Angstroms) |
 | `--gamma` | 10.0 | Lorentzian broadening width (cm⁻¹) |
-| `--n_clusters` | 50 | Number of clusters for diverse sampling |
+| `--n_clusters` | 1600 | Number of clusters for diverse sampling |
+| `--dropout` | 0.1 | Dropout rate | 
 
 
 ## Inference
