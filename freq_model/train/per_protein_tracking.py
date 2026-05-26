@@ -11,6 +11,10 @@ from typing import Dict, List
 import torch
 from collections import defaultdict
 
+from .data_utils import organize_by_frames, filter_frames_by_quality
+from .dataset import create_dataloaders
+from .train_optimized import evaluate
+
 
 def evaluate_per_protein(
     model,
@@ -34,9 +38,6 @@ def evaluate_per_protein(
     Returns:
         per_protein_metrics: {protein_id: {metric: value}}
     """
-    from data_utils import organize_by_frames, filter_frames_by_quality
-    from dataset import create_dataloaders
-    from train_optimized import evaluate
 
     model.eval()
     per_protein_metrics = {}

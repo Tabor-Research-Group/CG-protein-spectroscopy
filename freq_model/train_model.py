@@ -8,6 +8,7 @@ Usage:
 
 import argparse
 import json
+from collections import defaultdict
 import numpy as np
 import torch
 import torch.optim as optim
@@ -16,23 +17,24 @@ from pathlib import Path
 import warnings
 warnings.filterwarnings('ignore')
 
-from .data_utils import load_pkl_data, print_data_summary, organize_by_frames, filter_frames_by_quality, load_pkl_from_directory, load_individual_files_from_directory, extract_ground_truth_data, filter_frames_by_quality
-from .data_utils_lazy import load_pkl_sampled, estimate_memory_usage
-from .clustering import generate_and_cluster_spectra, plot_cluster_summary
-from .dataset import create_dataloaders
-from .model import create_model
-from .train_optimized import SpectrumLoss, train_one_epoch, evaluate, save_checkpoint
-from .evaluate import (
+from train.data_utils import load_pkl_data, print_data_summary, organize_by_frames, filter_frames_by_quality, load_pkl_from_directory, load_individual_files_from_directory, extract_ground_truth_data
+from train.data_utils_lazy import load_pkl_sampled, estimate_memory_usage
+from train.clustering import generate_and_cluster_spectra, plot_cluster_summary
+from train.dataset import create_dataloaders
+from train.model import create_model
+from train.train_optimized import SpectrumLoss, train_one_epoch, evaluate, save_checkpoint
+from train.evaluate import (
     plot_training_curves,
     plot_spectra_comparison,
     plot_site_energy_comparison,
     plot_site_energy_distribution,
     plot_average_spectrum,
-    save_metrics_summary
+    save_metrics_summary,
+    evaluate_protein_file
 )
-from .plot_frame_comparison import plot_individual_frames_detailed, plot_spectra_grid_comparison
-from .feature_importance import run_all_analyses
-from .extended_plots import generate_all_extended_plots
+from train.plot_frame_comparison import plot_individual_frames_detailed, plot_spectra_grid_comparison
+from train.feature_importance import run_all_analyses
+from train.extended_plots import generate_all_extended_plots
 
 
 def parse_args():
@@ -496,7 +498,7 @@ def main():
 
         # Per-protein tracking
         if args.track_per_protein and val_files_data:
-            from per_protein_tracking import evaluate_per_protein, plot_per_protein_evolution
+            from train.per_protein_tracking import evaluate_per_protein, plot_per_protein_evolution
 
             # Create config with all needed parameters
             eval_config = {
@@ -536,7 +538,6 @@ def main():
             print(f"GENERATING PLOTS FOR EPOCH {epoch}")
             print(f"{'='*80}")
 
-            from evaluate import plot_spectra_comparison, plot_average_spectrum, plot_site_energy_comparison
 
             # Create epoch-specific directory for plots
             epoch_plots_dir = output_dir / f'epoch_{epoch}_plots'
@@ -574,7 +575,6 @@ def main():
             # Plot 2: Per-protein plots (each protein separately)
             if args.track_per_protein and val_files_data:
                 print(f"\n  Generating PER-PROTEIN plots...")
-                from evaluate import evaluate_protein_file
 
                 per_protein_plots_dir = epoch_plots_dir / 'per_protein'
                 per_protein_plots_dir.mkdir(exist_ok=True)
@@ -670,7 +670,7 @@ def main():
         print("\n" + "="*80)
         print("PER-PROTEIN EVOLUTION PLOTS")
         print("="*80)
-        from per_protein_tracking import plot_per_protein_evolution, plot_final_per_protein_comparison
+        from train.per_protein_tracking import plot_per_protein_evolution, plot_final_per_protein_comparison
 
         tracking_dir = output_dir / 'per_protein_tracking'
         tracking_dir.mkdir(exist_ok=True)
@@ -734,7 +734,6 @@ def main():
 
         print(f"\nEvaluating {len(files_to_eval)} proteins individually...")
 
-        from evaluate import evaluate_protein_file
 
         per_protein_results = {}
 
@@ -745,7 +744,6 @@ def main():
             protein_frames = organize_by_frames(protein_data)
 
             # Filter frames
-            from data_utils import filter_frames_by_quality
             protein_frames, excluded, _ = filter_frames_by_quality(protein_frames, verbose=False)
 
             if len(protein_frames) == 0:
