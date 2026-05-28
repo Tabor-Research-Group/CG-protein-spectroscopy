@@ -10,7 +10,7 @@ from typing import Dict, List
 from pathlib import Path
 
 from .dataset import create_dataloaders
-from .train_optimized import evaluate, SpectrumLoss
+from .train import evaluate, SpectrumLoss
 import torch
 from .plot_frame_comparison import plot_individual_frames_detailed
 

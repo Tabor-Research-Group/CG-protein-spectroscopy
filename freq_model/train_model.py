@@ -17,12 +17,11 @@ from pathlib import Path
 import warnings
 warnings.filterwarnings('ignore')
 
-from train.data_utils import load_pkl_data, print_data_summary, organize_by_frames, filter_frames_by_quality, load_pkl_from_directory, load_individual_files_from_directory, extract_ground_truth_data
-from train.data_utils_lazy import load_pkl_sampled, estimate_memory_usage
+from train.data_utils import load_pkl_data, print_data_summary, organize_by_frames, filter_frames_by_quality, load_pkl_from_directory, load_individual_files_from_directory, extract_ground_truth_data, load_pkl_sampled
 from train.clustering import generate_and_cluster_spectra, plot_cluster_summary
 from train.dataset import create_dataloaders
 from train.model import create_model
-from train.train_optimized import SpectrumLoss, train_one_epoch, evaluate, save_checkpoint
+from train.train import SpectrumLoss, train_one_epoch, evaluate, save_checkpoint
 from train.evaluate import (
     plot_training_curves,
     plot_spectra_comparison,
@@ -148,7 +147,7 @@ def main():
     if args.train_dir:
         # Use memory-efficient loading if frames_per_file is specified
         if args.frames_per_file is not None:
-            print(f"\n⚠️  Memory-efficient mode: sampling {args.frames_per_file} frames per file")
+            print(f"\nMemory-efficient mode: sampling {args.frames_per_file} frames per file")
             train_data, train_file_mapping = load_pkl_sampled(
                 args.train_dir,
                 frames_per_file=args.frames_per_file,
@@ -335,9 +334,9 @@ def main():
         above_max_test = sum(e > model_config['max_energy'] for e in all_test_energies)
 
         if below_min_train > 0 or above_max_train > 0:
-            print(f"⚠️  WARNING: {below_min_train} train energies below min, {above_max_train} above max")
+            print(f"WARNING: {below_min_train} train energies below min, {above_max_train} above max")
         if below_min_test > 0 or above_max_test > 0:
-            print(f"⚠️  WARNING: {below_min_test} test energies below min, {above_max_test} above max")
+            print(f"WARNING: {below_min_test} test energies below min, {above_max_test} above max")
 
         if below_min_train == 0 and above_max_train == 0 and below_min_test == 0 and above_max_test == 0:
             print(f"✓ Model constraints fully cover ground truth range")
@@ -613,16 +612,16 @@ def main():
                             protein_data=protein_data
                         )
                     except Exception as e:
-                        print(f"      ⚠️  Error plotting {protein_id}: {e}")
+                        print(f"      Error plotting {protein_id}: {e}")
 
                     # Clear GPU memory after each protein to prevent OOM
                     if torch.cuda.is_available():
                         torch.cuda.empty_cache()
 
-                print(f"    ✓ Per-protein plots saved to {per_protein_plots_dir}/")
+                print(f"    Per-protein plots saved to {per_protein_plots_dir}/")
 
             if not sample_results:
-                print(f"  ⚠️  No sample results available for plotting")
+                print(f"  No sample results available for plotting")
 
         # Save checkpoint
         if epoch % args.save_interval == 0:
@@ -688,7 +687,7 @@ def main():
         # Save per-protein history to JSON
         per_protein_json = {}
         for protein_id, metrics in per_protein_history.items():
-            per_protein_json[protein_id] = {k: list(v) for k, v in metrics.items()}
+            per_protein_json[protein_id] = {k: list(map(float, v)) for k, v in metrics.items()}
 
         with open(tracking_dir / 'per_protein_history.json', 'w') as f:
             json.dump(per_protein_json, f, indent=2)

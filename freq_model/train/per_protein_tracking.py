@@ -13,7 +13,7 @@ from collections import defaultdict
 
 from .data_utils import organize_by_frames, filter_frames_by_quality
 from .dataset import create_dataloaders
-from .train_optimized import evaluate
+from .train import evaluate
 
 
 def evaluate_per_protein(
@@ -76,13 +76,12 @@ def evaluate_per_protein(
                 device=device,
                 omega_grid=omega_grid_tensor
             )
-            results = avg_metrics  # Use avg_metrics from the tuple return
 
         per_protein_metrics[protein_id] = {
-            'spectrum_corr': results['spectrum_corr'],
-            'peak_error_cm': results['peak_error_cm'],
-            'spectrum_mse': results['spectrum_mse'],
-            'site_energy_mae': results['site_energy_mae'],
+            'spectrum_corr': avg_metrics['spectrum_corr'],
+            'peak_error_cm': avg_metrics['peak_error_cm'],
+            'spectrum_mse': avg_metrics['spectrum_mse'],
+            'site_energy_mae': avg_metrics['site_energy_mae'],
         }
 
     return per_protein_metrics

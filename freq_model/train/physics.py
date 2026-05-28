@@ -1,16 +1,13 @@
 """
 Physics calculations for amide I spectroscopy.
-
-Implements:
-1. Torii dipole calculation with correct formula
-2. Tasumi transition dipole coupling (TDC)
-3. Spectrum generation from Hamiltonian
 """
 
 import numpy as np
 import torch
 from typing import Tuple, Optional
 
+# tan(10°)
+tan_10 = np.tan(np.radians(10.0))
 
 def calculate_torii_dipole_numpy(C: np.ndarray, O: np.ndarray, N: np.ndarray) -> np.ndarray:
     """
@@ -59,9 +56,6 @@ def calculate_torii_dipole_numpy(C: np.ndarray, O: np.ndarray, N: np.ndarray) ->
         discriminant = 0  # numerical safety
     sqrt_term = np.sqrt(discriminant)
 
-    # tan(10°)
-    tan_10 = np.tan(np.radians(10.0))
-
     # Full formula with AIM prefactor (0.276 instead of 2.73)
     mu = 0.276 * (s - (CO_dot_s + sqrt_term / tan_10) * CO_unit)
 
@@ -108,9 +102,6 @@ def calculate_torii_dipole_batch_numpy(C: np.ndarray, O: np.ndarray, N: np.ndarr
     discriminant = s_mag_sq - CO_dot_s**2
     discriminant = np.maximum(discriminant, 0)  # numerical safety
     sqrt_term = np.sqrt(discriminant)  # [N, 1]
-
-    # tan(10°)
-    tan_10 = np.tan(np.radians(10.0))
 
     # Full formula with AIM prefactor
     mu = 0.276 * (s - (CO_dot_s + sqrt_term / tan_10) * CO_unit)  # [N, 3]
@@ -159,9 +150,6 @@ def calculate_torii_dipole_batch_torch(C: torch.Tensor, O: torch.Tensor, N: torc
     discriminant = torch.clamp(discriminant, min=0)  # numerical safety
     sqrt_term = torch.sqrt(discriminant)  # [N, 1]
 
-    # tan(10°)
-    tan_10 = np.tan(np.radians(10.0))
-
     # Full formula with AIM prefactor
     mu = 0.276 * (s - (CO_dot_s + sqrt_term / tan_10) * CO_unit)  # [N, 3]
 
@@ -180,7 +168,7 @@ def calculate_tasumi_coupling_numpy(dipoles: np.ndarray, C_positions: np.ndarray
 
     Args:
         dipoles: Dipole vectors [N, 3] in Debye
-        C_positions: Carbon positions [N, 3] in Angstroms
+        C_positions: Carbon positions [N, 3] in Å
 
     Returns:
         J: Coupling matrix [N, N] in cm^-1
@@ -265,6 +253,59 @@ def calculate_tasumi_coupling_torch(dipoles: torch.Tensor, C_positions: torch.Te
     mask = (r_mag >= 1.0)
     J = J * mask.float()
     J = J - torch.diag(torch.diag(J))  # ensure diagonal is zero
+
+    return J
+
+
+def calculate_tasumi_coupling_batch_torch(dipoles: torch.Tensor, C_positions: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
+    """
+    Batched Tasumi coupling calculation.
+
+    Args:
+        dipoles: [B, N, 3]
+        C_positions: [B, N, 3]
+        mask: [B, N] - 1 for valid, 0 for padded
+
+    Returns:
+        J_matrix: [B, N, N]
+    """
+    B, N, _ = dipoles.shape
+    device = dipoles.device
+
+    # Pairwise distance vectors: r_ij = r_j - r_i
+    r_ij = C_positions.unsqueeze(2) - C_positions.unsqueeze(1)
+
+    # Distance magnitudes [B, N, N]
+    r_mag = torch.norm(r_ij, dim=3)
+
+    # For close pairs (<1 Å) and diagonal, use safe distance to prevent division issues
+    # Padded atoms are at z=1000 Å, so their distances are ~1000 Å (safe)
+    r_mag_safe = torch.clamp(r_mag, min=1.0)  # Minimum distance 1 Å
+
+    # Unit vectors [B, N, N, 3]
+    r_unit = r_ij / r_mag_safe.unsqueeze(3)
+
+    # Compute dot products for Tasumi formula
+    mu_dot = torch.sum(dipoles.unsqueeze(2) * dipoles.unsqueeze(1), dim=3)  # [B, N, N]
+    mu_i_dot_r = torch.sum(dipoles.unsqueeze(2) * r_unit, dim=3)  # [B, N, N]
+    mu_j_dot_r = torch.sum(dipoles.unsqueeze(1) * r_unit, dim=3)  # [B, N, N]
+
+    # Tasumi coupling formula: J = 5034 * [μ_i·μ_j / r³ - 3(μ_i·r)(μ_j·r) / r⁵]
+    r3 = r_mag_safe**3
+    r5 = r_mag_safe**5
+    J = 5034.0 * (mu_dot / r3 - 3.0 * mu_i_dot_r * mu_j_dot_r / r5)
+
+    # Zero out diagonal (self-coupling)
+    eye = torch.eye(N, device=device).unsqueeze(0).expand(B, -1, -1)
+    J = J * (1 - eye)
+
+    # Zero out very close pairs (< 1 Å) - physical cutoff
+    close_mask = (r_mag >= 1.0).float()
+    J = J * close_mask
+
+    # Apply oscillator mask to zero out contributions from padded oscillators
+    mask_2d = mask.unsqueeze(2) * mask.unsqueeze(1)  # [B, N, N]
+    J = J * mask_2d
 
     return J
 
@@ -472,7 +513,7 @@ def batch_generate_spectra_torch(
         H_diag_batch: [B, N_i] site energies for B frames (padded)
         J_matrix_batch: [B, N_i, N_i] coupling matrices
         dipoles_batch: [B, N_i, 3] dipole vectors
-        mask_batch: [B, N_i] oscillator mask (1=valid, 0=padded) - CRITICAL for excluding padded oscillators
+        mask_batch: [B, N_i] oscillator mask (1=valid, 0=padded) for excluding padded oscillators
 
     Returns:
         spectra_batch: [B, M] where M is number of frequency points
@@ -487,14 +528,12 @@ def batch_generate_spectra_torch(
     spectra = []
 
     for i in range(B):
-        # CRITICAL FIX: Pass the mask to exclude padded oscillators from eigenvalue decomposition
-        # Without this, padded atoms at z=1000 Å cause numerical instability and NaN values
         current_mask = mask_batch[i] if mask_batch is not None else None
         _, spectrum = generate_spectrum_torch(
             H_diag_batch[i],
             J_matrix_batch[i],
             dipoles_batch[i],
-            mask=current_mask,  # FIXED: Now passing the mask
+            mask=current_mask,
             omega_min=omega_min,
             omega_max=omega_max,
             omega_step=omega_step,

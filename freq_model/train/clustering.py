@@ -18,9 +18,7 @@ from .data_utils import extract_ground_truth_data
 
 def extract_spectral_features(spectrum: np.ndarray, omega_grid: np.ndarray) -> np.ndarray:
     """
-    Extract features from a spectrum for clustering.
-
-    Features:
+    Extracts the following features from a spectrum for clustering.
         - Peak position (center of mass)
         - Peak width (second moment)
         - Peak height (max value)
