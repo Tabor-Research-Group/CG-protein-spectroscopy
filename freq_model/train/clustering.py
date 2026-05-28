@@ -21,9 +21,8 @@ def extract_spectral_features(spectrum: np.ndarray, omega_grid: np.ndarray) -> n
     Extracts the following features from a spectrum for clustering.
         - Peak position (center of mass)
         - Peak width (second moment)
-        - Peak height (max value)
         - Spectrum moments (mean, std)
-        - Spectrum at key frequencies
+        - Intensity at every 10 cm-1
 
     Args:
         spectrum: [M] intensity values
@@ -45,9 +44,6 @@ def extract_spectral_features(spectrum: np.ndarray, omega_grid: np.ndarray) -> n
     # Peak width (second moment)
     peak_width = np.sqrt(np.sum((omega_grid - peak_position)**2 * spectrum_norm) / (total_intensity + 1e-6))
 
-    # Peak height
-    peak_height = np.max(spectrum_norm)
-
     # Moments
     mean_intensity = np.mean(spectrum_norm)
     std_intensity = np.std(spectrum_norm)
@@ -63,7 +59,6 @@ def extract_spectral_features(spectrum: np.ndarray, omega_grid: np.ndarray) -> n
     features = np.array([
         peak_position,
         peak_width,
-        peak_height,
         mean_intensity,
         std_intensity,
     ] + key_intensities)
