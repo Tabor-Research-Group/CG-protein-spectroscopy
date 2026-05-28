@@ -39,6 +39,8 @@ python train/main.py \
     --batch_size 8
 ```
 
+Please note that model training is sensitive to the dataset size. In particular, the `--n_clusters` parameter controlling the number of K-means clusters used in sampling should be set with care. For example, our default value (1600 clusters) works well for our final dataset, but an identical architecture with 1600 clusters across 5 times more data did not train. 
+
 ## Data Format
 
 ### Input Data (PKL Files)
