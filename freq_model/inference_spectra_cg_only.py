@@ -34,11 +34,9 @@ from torch.utils.data import DataLoader
 # Import physics functions 
 from train.physics import (
     calculate_torii_dipole_batch_torch,
-    batch_generate_spectra_torch
+    batch_generate_spectra_torch,
+    calculate_tasumi_coupling_batch_torch
 )
-
-# Import coupling function 
-from train.train_optimized import calculate_tasumi_coupling_batch_torch
 
 # Publication-quality plotting
 plt.rcParams['font.family'] = 'DejaVu Sans'
