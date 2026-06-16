@@ -4,15 +4,6 @@
 COMPLETE TRAJECTORY-BASED INFERENCE WITH RAMA & DIPOLE ANALYSIS
 ================================================================================
 
-Features:
-  ✓ Fast vectorized trajectory extraction (CG + optional atomistic)
-  ✓ DDIM sampling with FP16/AMP for maximum speed
-  ✓ Ramachandran angle calculation (predicted + atomistic if enabled)
-  ✓ Dipole vector calculation (predicted + atomistic if enabled)
-  ✓ Checkpoint/resume capability
-  ✓ Chunked processing with progress tracking
-  ✓ Compatible output format with existing pickle structure
-
 Usage:
     python infer_from_trajectory_complete.py \\
         --config config_inference_traj.yaml \\
@@ -23,12 +14,6 @@ The config file controls all parameters including:
   - compute_analysis: true/false (rama + dipole for predictions)
   - compute_atomistic_analysis: true/false (rama + dipole for atomistic)
   
-Output pickle format matches amino_acid_baskets structure with added fields:
-  - Each oscillator has 'predicted_atoms': Dict[str, np.ndarray]
-  - If compute_analysis=true: 'predicted_rama_nnfs' and 'predicted_dipole'
-  - If extract_atomistic=true: 'atoms' field with atomistic coords
-  - If compute_atomistic_analysis=true: 'atomistic_dipole' field
-
 ================================================================================
 """
 
@@ -54,17 +39,7 @@ import yaml
 from scipy.spatial.transform import Rotation
 from tqdm import tqdm
 
-try:
-    from MDAnalysis.lib.distances import calc_dihedrals
-except ImportError:
-    print("ERROR: MDAnalysis required. Install: pip install MDAnalysis")
-    sys.exit(1)
-
-# Add backmap to path
-_SCRIPT_DIR = Path(__file__).parent
-_BACKMAP_DIR = _SCRIPT_DIR / "backmap_diffusion_production_2_2_3"
-if _BACKMAP_DIR.exists():
-    sys.path.insert(0, str(_BACKMAP_DIR))
+from MDAnalysis.lib.distances import calc_dihedrals
 
 from backmap.config import Config
 from backmap.data.collate import collate_graph_samples
@@ -811,7 +786,7 @@ def compute_phi_psi_from_backbone_oscillators(
     source: str = 'atoms'  # 'atoms' or 'predicted_atoms'
 ) -> Tuple[Dict[int, float], Dict[int, float], Optional[int], Optional[int]]:
     """
-    Compute φ/ψ angles from backbone oscillators using MDAnalysis-consistent dihedrals.
+    Compute φ/ψ angles from backbone oscillators
     
     Args:
         oscillators: List of backbone oscillators
@@ -1430,7 +1405,7 @@ def process_trajectory(
                 "Checkpoint frame selection does not match current selection. "
                 "Delete the checkpoint file (and optionally the output pkl) and rerun."
             )
-        print(f"\n✓ Resuming from checkpoint: {len(checkpoint.frames_processed)} frames done")
+        print(f"\nResuming from checkpoint: {len(checkpoint.frames_processed)} frames done")
         start_pos = checkpoint.last_chunk_pos
     else:
         checkpoint = InferenceCheckpoint.initialize(
@@ -1476,9 +1451,9 @@ def process_trajectory(
             for _, oscs in existing.items():
                 if isinstance(oscs, list):
                     all_oscillators_data.extend(oscs)
-            print(f"  ✓ Loaded {len(all_oscillators_data)} oscillators from existing output for resume")
+            print(f"  Loaded {len(all_oscillators_data)} oscillators from existing output for resume")
         except Exception as e:
-            print(f"  ⚠ Could not load existing output pkl for resume ({type(e).__name__}: {e}). Continuing without it.")
+            print(f"  Could not load existing output pkl for resume ({type(e).__name__}: {e}). Continuing without it.")
             all_oscillators_data = []
 
     
@@ -1499,14 +1474,14 @@ def process_trajectory(
         cg_frames, ordered_residues = parse_cg_pdb_frames_vectorized(
             cg_pdb_file, chunk_frames
         )
-        print(f"      ✓ Extracted {len(cg_frames)} frames")
+        print(f"      Extracted {len(cg_frames)} frames")
         
         # Extract atomistic if enabled
         atomistic_frames = None
         if extract_atomistic:
             print("  2/5 Extracting atomistic data...")
             atomistic_frames = extract_atomistic_frames_vectorized(u, chunk_frames)
-            print(f"      ✓ Extracted {len(atomistic_frames)} frames")
+            print(f"      Extracted {len(atomistic_frames)} frames")
         else:
             print("  2/5 Skipping atomistic extraction (disabled)")
         
@@ -1590,7 +1565,7 @@ def process_trajectory(
             
             chunk_oscillators.extend(oscillators)
         
-        print(f"      ✓ Inference complete: {len(chunk_oscillators)} oscillators")
+        print(f"      Inference complete: {len(chunk_oscillators)} oscillators")
         
         # Compute analysis
         compute_analysis = config['infer'].get('compute_analysis', True)
@@ -1608,7 +1583,7 @@ def process_trajectory(
                 source='predicted_atoms',
                 target_field='predicted_dipole'
             )
-            print("      ✓ Analysis complete")
+            print("      Analysis complete")
         else:
             print("  4/5 Skipping predicted analysis (disabled)")
         
@@ -1624,7 +1599,7 @@ def process_trajectory(
                 source='atoms',
                 target_field='atomistic_dipole'
             )
-            print("      ✓ Atomistic analysis complete")
+            print("      Atomistic analysis complete")
         else:
             print("  5/5 Skipping atomistic analysis")
         
@@ -1641,7 +1616,7 @@ def process_trajectory(
                 amino_acid_baskets_tmp[resname].append(osc)
             with open(output_pkl_path, 'wb') as f:
                 pickle.dump(amino_acid_baskets_tmp, f)
-            print(f"      ✓ Intermediate output saved: {output_pkl_path}")
+            print(f"      Intermediate output saved: {output_pkl_path}")
 
         # Update checkpoint
         checkpoint.frames_processed.extend(chunk_frames)
