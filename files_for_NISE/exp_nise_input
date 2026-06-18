@@ -1,0 +1,15 @@
+Hamiltonianfile hamiltonians_predicted.bin
+Dipolefile dipoles_predicted.bin
+Length 5000
+Samplerate 10
+Lifetime 1800
+Homogeneous 1800
+Inhomogeneous 1800
+Timestep 20
+RunTimes 128 0 128
+Singles 41
+Propagation Coupling
+MinFrequencies 1550 1550 1550
+MaxFrequencies 1750 1750 1750 
+FFT 3000
+Technique Absorption
