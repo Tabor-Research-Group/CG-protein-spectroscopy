@@ -168,6 +168,17 @@ python inference_spectra.py \
     --output new_results/
 ```
 
+### Creating Input Files from Generic Backmappings
+
+This site frequency model can be used with any generic protein backmapping method. Input files can be generated using `extract_generic.py` from any file formats accepted by MDAnalysis.
+
+```
+# For combined topology/trajectory file formats
+python extract_generic.py -f example_trj.pdb -o extracted_trj.pkl
+
+# For separate topology and file formats
+python extract_generic.py -f example_top.gro example_trj.xtc -o extracted_trj.pkl
+```
 
 ## Output Files
 
