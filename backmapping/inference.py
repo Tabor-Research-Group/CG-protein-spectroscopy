@@ -110,6 +110,8 @@ def ddim_sample_atoms(
         raise ValueError("ddim_steps must be > 0")
     timestep_sequence = np.linspace(T - 1, 0, ddim_steps, dtype=int)
     alpha_bars = diffusion.schedule.alpha_bars.to(device=device, dtype=torch.float64)
+    sqrt_alpha_bars = diffusion.schedule.sqrt_alpha_bars.to(device=device, dtype=torch.float64)
+    sqrt_one_minus_alpha_bars = diffusion.schedule.sqrt_one_minus_alpha_bars.to(device=device, dtype=torch.float64)
     
     for i, t in enumerate(timestep_sequence):
         t_curr = int(t)
@@ -127,7 +129,7 @@ def ddim_sample_atoms(
             node_geom = build_node_geom_sph(Nn, batch["atom_node_indices"], xt_local, eps=eps)
             t_node = torch.full((Nn,), t_curr, device=device, dtype=torch.long)
             
-            _, x0_pred_local = model(
+            _, pred_local = model(
                 node_pos=node_pos,
                 node_type=batch["node_type"],
                 node_name=batch["node_name"],
@@ -144,24 +146,21 @@ def ddim_sample_atoms(
                 edge_cutoffs=edge_cutoffs,
             )
         
-        x0_pred_local = clamp_local_atoms(x0_pred_local, max_atom_radius, eps=eps)
+        pred_local = clamp_local_atoms(pred_local, max_atom_radius, eps=eps)
         
         # DDIM update
-        a_t = alpha_bars[t_curr]
+        sqrt_a_t = sqrt_alpha_bars[t_curr].to(dtype=torch.float32)
+        sqrt_one_minus_a_t = sqrt_one_minus_alpha_bars[t_curr].to(dtype=torch.float32)
         if t_next >= 0:
-            a_next = alpha_bars[t_next]
+            sqrt_a_next = sqrt_alpha_bars[t_next].to(dtype=torch.float32)
+            sqrt_one_minus_a_next = sqrt_one_minus_alpha_bars[t_next].to(dtype=torch.float32)
         else:
-            a_next = torch.tensor(1.0, device=device, dtype=torch.float64)
+            sqrt_a_next = torch.tensor(1.0, device=device, dtype=torch.float32)
+            sqrt_one_minus_a_next = torch.sqrt(eps).to(dtype=torch.float32)
         
-        sqrt_a_t = torch.sqrt(torch.clamp(a_t, min=eps)).to(dtype=torch.float32)
-        sqrt_one_minus_a_t = torch.sqrt(torch.clamp(1.0 - a_t, min=eps)).to(dtype=torch.float32)
+        pred_x0 = (xt_local - sqrt_one_minus_a_t * pred_local) / torch.clamp(sqrt_a_t, min=eps)
         
-        eps_pred = (xt_local - sqrt_a_t * x0_pred_local) / torch.clamp(sqrt_one_minus_a_t, min=eps)
-        
-        sqrt_a_next = torch.sqrt(torch.clamp(a_next, min=eps)).to(dtype=torch.float32)
-        sqrt_one_minus_a_next = torch.sqrt(torch.clamp(1.0 - a_next, min=eps)).to(dtype=torch.float32)
-        
-        xt_local = sqrt_a_next * x0_pred_local + sqrt_one_minus_a_next * eps_pred
+        xt_local = sqrt_a_next * pred_x0 + sqrt_one_minus_a_next * pred_local
         xt_local = clamp_local_atoms(xt_local, max_atom_radius, eps=eps)
     
     x_final_local = xt_local
