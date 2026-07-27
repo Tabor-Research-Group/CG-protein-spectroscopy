@@ -76,7 +76,6 @@ def ddim_sample_atoms(
     edge_cutoffs: EdgeCutoffs,
     eps: float = 1e-8,
     init: str = "uniform_ball",
-    eta: float = 0.0,
     use_amp: bool = False,
 ) -> Tuple[torch.Tensor, torch.Tensor]:
     """DDIM sampling in local space.
@@ -162,18 +161,7 @@ def ddim_sample_atoms(
         sqrt_a_next = torch.sqrt(torch.clamp(a_next, min=eps)).to(dtype=torch.float32)
         sqrt_one_minus_a_next = torch.sqrt(torch.clamp(1.0 - a_next, min=eps)).to(dtype=torch.float32)
         
-        if eta != 0.0 and t_next >= 0:
-            # stochasticity
-            sigma_t = (
-                eta
-                * torch.sqrt((1 - a_next) / (1 - a_t))
-                * torch.sqrt(torch.clamp(1 - a_t / a_next, min=0.0))
-            ).to(dtype=torch.float32)
-            noise = torch.randn_like(xt_local)
-            xt_local = sqrt_a_next * x0_pred_local + sqrt_one_minus_a_next * eps_pred + sigma_t * noise
-        else:
-            xt_local = sqrt_a_next * x0_pred_local + sqrt_one_minus_a_next * eps_pred
-        
+        xt_local = sqrt_a_next * x0_pred_local + sqrt_one_minus_a_next * eps_pred
         xt_local = clamp_local_atoms(xt_local, max_atom_radius, eps=eps)
     
     x_final_local = xt_local
@@ -1187,7 +1175,6 @@ def run_inference_on_oscillators(
     vocab: Any,
     config: Dict,
     device: torch.device,
-    use_ddim: bool = True,
     ddim_steps: int = 50,
     use_fp16: bool = True,
 ) -> List[Dict]:
@@ -1269,30 +1256,17 @@ def run_inference_on_oscillators(
             batch[k] = v.to(device)
     
     # Sample
-    if use_ddim:
-        x_final_local, x_final_global = ddim_sample_atoms(
-            model=model,
-            diffusion=diffusion,
-            batch=batch,
-            ddim_steps=ddim_steps,
-            max_atom_radius=config['model']['max_atom_radius'],
-            edge_cutoffs=edge_cutoffs,
-            eps=config['loss']['eps'],
-            init=config['diffusion']['sample_init'],
-            eta=0.0,
-            use_amp=use_fp16 and device.type == 'cuda',
-        )
-    else:
-        x_final_local, x_final_global = sample_atoms_full(
-            model=model,
-            diffusion=diffusion,
-            batch=batch,
-            timesteps=diffusion.timesteps,
-            max_atom_radius=config['model']['max_atom_radius'],
-            edge_cutoffs=edge_cutoffs,
-            eps=config['loss']['eps'],
-            init=config['diffusion']['sample_init'],
-        )
+    x_final_local, x_final_global = ddim_sample_atoms(
+        model=model,
+        diffusion=diffusion,
+        batch=batch,
+        ddim_steps=ddim_steps,
+        max_atom_radius=config['model']['max_atom_radius'],
+        edge_cutoffs=edge_cutoffs,
+        eps=config['loss']['eps'],
+        init=config['diffusion']['sample_init'],
+        use_amp=use_fp16 and device.type == 'cuda',
+    )
     
     # Convert to numpy
     x_final_global_np = x_final_global.detach().cpu().numpy().astype(np.float32)
@@ -1558,7 +1532,6 @@ def process_trajectory(
                 vocab,
                 config,
                 device,
-                use_ddim=True,
                 ddim_steps=config['infer'].get('ddim_steps', 50),
                 use_fp16=config['infer'].get('use_fp16', True),
             )
