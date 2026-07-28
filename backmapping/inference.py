@@ -156,7 +156,7 @@ def ddim_sample_atoms(
             sqrt_one_minus_a_next = sqrt_one_minus_alpha_bars[t_next].to(dtype=torch.float32)
         else:
             sqrt_a_next = torch.tensor(1.0, device=device, dtype=torch.float32)
-            sqrt_one_minus_a_next = torch.sqrt(eps).to(dtype=torch.float32)
+            sqrt_one_minus_a_next = torch.sqrt(torch.tensor(eps, device=device, dtype=torch.float32)).to(dtype=torch.float32)
         
         pred_x0 = (xt_local - sqrt_one_minus_a_t * pred_local) / torch.clamp(sqrt_a_t, min=eps)
         
