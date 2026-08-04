@@ -4,14 +4,14 @@ Physics calculations for amide I spectroscopy.
 
 import numpy as np
 import torch
-from typing import Tuple, Optional
+from typing import Tuple
 
 # tan(10°)
 tan_10 = np.tan(np.radians(10.0))
 
 def calculate_torii_dipole_numpy(C: np.ndarray, O: np.ndarray, N: np.ndarray) -> np.ndarray:
     """
-    Calculate Torii dipole with correct formula (NumPy version).
+    Calculate Torii dipole (NumPy version).
 
     Formula:
         μ = 0.276 * (s - ((CO·s) + sqrt(|s|^2 - (CO·s)^2) / tan(10°)) * CO)
@@ -446,7 +446,7 @@ def generate_spectrum_torch(
         omega_grid = torch.arange(omega_min, omega_max + omega_step, omega_step, device=device)
         return omega_grid, torch.zeros_like(omega_grid)
 
-    # Diagonalize (use symeig for differentiability)
+    # Diagonalize
     # Add small regularization for numerical stability
     try:
         eigenvalues, eigenvectors = torch.linalg.eigh(H)  # [N], [N, N]

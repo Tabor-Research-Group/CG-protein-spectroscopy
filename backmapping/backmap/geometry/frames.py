@@ -2,12 +2,6 @@ from __future__ import annotations
 
 """Local residue frames and SE(3) transforms.
 
-This module defines:
-
-* compute_residue_local_frames: build a right-handed orthonormal frame per residue
-* global_to_local / local_to_global: coordinate transforms using those frames
-* clamp_norm: stable norm clamping for diffusion stability
-
 Conventions
 -----------
 Frames are stored as rotation matrices R with columns [e1, e2, e3].
@@ -15,8 +9,6 @@ Given origin O (typically BB bead):
 
   local = R^T (global - O)
   global = O + R local
-
-All operations are differentiable in PyTorch.
 """
 
 from typing import Optional
@@ -71,19 +63,6 @@ def compute_residue_local_frames(
     if N < 1:
         raise ValueError("bb_pos must have at least one residue")
 
-    # N==1: by default, return identity.
-    #
-    # However, for *sidechain* oscillators we often have only one residue in the
-    # local frame. In that case, an identity frame ties our spherical coordinates
-    # to the *global* axes, which destroys rotational invariance and makes the
-    # learning problem harder than necessary.
-    #
-    # If `sc1_pos` is provided (a reference point for this residue), we use the
-    # direction (sc1_pos - bb_pos) to define a deterministic, right-handed frame:
-    #   e1 = unit(sc1_pos - bb_pos)
-    #   e2 = arbitrary perpendicular to e1 (deterministic)
-    #   e3 = e1 x e2
-    # This yields stable local spherical coordinates even for single-residue graphs.
     if N == 1:
         if sc1_pos is not None:
             if sc1_pos.shape != bb_pos.shape:

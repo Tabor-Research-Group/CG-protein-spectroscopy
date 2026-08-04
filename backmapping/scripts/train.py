@@ -1,20 +1,7 @@
 #!/usr/bin/env python3
-from __future__ import annotations
-import numpy as np
-# -----------------------------------------------------------------------------
-# Make the repository importable when running as:
-#   python scripts/train.py ...
-# without requiring `pip install -e .`.
-# -----------------------------------------------------------------------------
-import os as _os
-import sys as _sys
-_REPO_ROOT = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
-if _REPO_ROOT not in _sys.path:
-    _sys.path.insert(0, _REPO_ROOT)
-del _os, _sys, _REPO_ROOT
 
-
-"""Train the diffusion backmapping model.
+"""
+Train the diffusion backmapping model.
 
 Highlights
 ----------
@@ -30,14 +17,22 @@ You can override common options:
       --out runs/exp01 --device cuda --epochs 20 --batch_size 16
 """
 
+from __future__ import annotations
+
+import os as _os
+import sys as _sys
+_REPO_ROOT = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
+if _REPO_ROOT not in _sys.path:
+    _sys.path.insert(0, _REPO_ROOT)
+del _os, _sys, _REPO_ROOT
+
 import argparse
-import json
-import os
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
 import torch
 from torch.utils.data import DataLoader, Subset
+import numpy as np
 
 from backmap.config import Config
 from backmap.data.collate import collate_graph_samples
@@ -57,7 +52,7 @@ from backmap.train.metrics import BatchMetrics, compute_batch_metrics
 from backmap.train.plotting import plot_epoch_metrics
 from backmap.utils.checkpoint import load_checkpoint, save_checkpoint
 from backmap.utils.logging import JsonlWriter, setup_logger
-from backmap.utils.seed import seed_all
+from backmap.utils.seed import set_global_seed
 from backmap.utils.pdb import (
     aggregate_atomistic_from_oscillators,
     aggregate_cg_from_oscillators,
@@ -214,16 +209,6 @@ def _evaluate(
 ) -> Tuple[Dict[str, float], Dict[str, Any]]:
     """Evaluate a split.
 
-    Notes
-    -----
-    Unlike the training loop, evaluation must *not* allow malformed batches to
-    dominate the reported mean (e.g., clamped-to-cap values). We therefore
-    **skip** batches flagged as bad by compute_losses (non-finite intermediate
-    values), and we log how many were skipped.
-
-    MODIFIED: Now collects metrics from ALL batches when max_batches_for_metrics
-    is None or 0 (for publication-quality plots with complete data).
-
     Returns
     -------
     loss_means:
@@ -259,10 +244,10 @@ def _evaluate(
         "dihedral_true",
         "dihedral_pred",
         "dipole_cos",
-        "nonbond_min_true",      # NEW: for publication plots
-        "nonbond_min_pred",      # NEW: for publication plots
-        "repulsion_energy_true", # NEW: for publication plots
-        "repulsion_energy_pred", # NEW: for publication plots
+        "nonbond_min_true",
+        "nonbond_min_pred",
+        "repulsion_energy_true",
+        "repulsion_energy_pred",
         # contact metric name has changed across versions; accept either if present
         "contact",
         "contact_penalty",
@@ -548,7 +533,7 @@ def main() -> None:
     run_dir.mkdir(parents=True, exist_ok=True)
 
     logger = setup_logger(str(run_dir), name="train")
-    seed_all(cfg.train.seed)
+    set_global_seed(cfg.train.seed)
 
     # Save config snapshot for reproducibility
     cfg.save_json(run_dir / "config.json")

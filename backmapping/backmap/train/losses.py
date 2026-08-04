@@ -2,27 +2,18 @@ from __future__ import annotations
 
 """Loss functions for oscillator-local backmapping.
 
-This module is designed to be *production safe*:
-
-- It refuses to silently compute a loss on an empty atom tensor (Na==0).
-  (That situation is the classic reason for losses being printed as 0.0000.)
-- It avoids NaNs/Infs by clamping unstable operations (e.g., 1/r) and by using
-  non-exploding close-contact penalties.
-- It returns a structured breakdown suitable for JSON logging and per-epoch plots.
-
 Coordinate systems
 ------------------
-The model predicts atom coordinates in the **local residue frame**.
+The model predicts atom coordinates in the local residue frame
 
 - Denoising losses are computed in local coordinates.
-- Geometry/physics losses are computed in global coordinates after transforming
-  predicted and target local coordinates back with the residue frames.
+- Geometry/physics losses are computed in global coordinates after transforming predicted and target local coordinates back with the residue frames.
 
 The batch must be created by :func:`backmap.data.collate.collate_graph_samples`.
 """
 
 from dataclasses import dataclass
-from typing import Dict, Tuple
+from typing import Dict
 
 import torch
 import torch.nn.functional as F
@@ -49,8 +40,6 @@ def _safe_norm(v: torch.Tensor, eps: float) -> torch.Tensor:
 
 def _clamp_term(x: torch.Tensor, max_val: float) -> torch.Tensor:
     """Clamp a loss term to avoid exploding gradients.
-
-    Note: we clamp *after* nan_to_num so NaN does not silently become 0.
     """
     x = torch.nan_to_num(x, nan=max_val, posinf=max_val, neginf=max_val)
     return torch.clamp(x, -float(max_val), float(max_val))
@@ -79,16 +68,6 @@ def _angle_sincos(a: torch.Tensor, b: torch.Tensor, c: torch.Tensor, eps: float)
 @dataclass
 class LossBreakdown:
     """Scalar losses for logging plus a debug flag.
-
-    Why the `bad` flag?
-    -------------------
-    If a batch contains NaNs/Infs (in inputs or intermediate geometry), PyTorch
-    will happily propagate them through the model. One optimizer step with NaN
-    gradients can permanently poison the weights, after which *every* batch will
-    look bad.
-
-    We therefore surface a `bad` flag so the training loop can **skip** such
-    batches *before* backward/optimizer.step().
     """
 
     total: torch.Tensor
@@ -219,16 +198,6 @@ def contact_loss(
     eps: float,
 ) -> torch.Tensor:
     """Penalize predicted non-bonded atom-atom contacts below r0.
-
-    This is not meant to be a full force field. It is a **stability term** that
-    discourages catastrophic self-intersections during training and sampling.
-
-    Implementation notes
-    --------------------
-    - Operates *within each sample* using `atom_ptr` to avoid cross-sample pairs.
-    - Excludes directly bonded pairs (from bond_index) from the contact penalty.
-    - Uses a bounded quadratic hinge: relu(r0 - r)^2, which is stable and does
-      not blow up to inf.
     """
     if "atom_ptr" not in batch:
         # This should never happen when using our collate function.
@@ -376,11 +345,6 @@ def compute_losses(
         + float(cfg.w_contact) * cont
     )
 
-
-    # --- detect non-finite values BEFORE clamping ---
-    #
-    # Note: we still clamp for safety, but we must NOT allow a non-finite batch
-    # to backprop / optimizer.step(), otherwise weights can become NaN.
     bad_terms = []
 
     def _flag_if_bad(name: str, t: torch.Tensor) -> None:

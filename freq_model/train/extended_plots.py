@@ -11,11 +11,8 @@ Includes:
 
 import numpy as np
 import matplotlib.pyplot as plt
-import seaborn as sns
 from pathlib import Path
 from typing import Dict, List
-from scipy.signal import find_peaks
-
 
 def plot_detailed_loss_curves(history: Dict, save_path: Path):
     """

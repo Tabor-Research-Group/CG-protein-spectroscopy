@@ -1,23 +1,8 @@
 from __future__ import annotations
 
 """PDB writing and structure aggregation utilities.
-
-The training/inference code deals with oscillator-local graphs, but for
-visualization (VMD, PyMOL) you usually want a *whole-frame* structure.
-
-This module provides:
-- helpers to aggregate atomistic atoms and CG beads per residue from a list of
-  oscillator dictionaries
-- helpers to aggregate predicted atom coordinates (from oscillator predictions)
-- a minimal PDB writer that writes multiple chains so you can overlay:
-    chain A : ground truth atomistic
-    chain B : predicted atomistic
-    chain C : CG beads
-
-We intentionally keep PDB output minimal but valid enough for VMD.
 """
 
-import math
 from typing import Dict, Iterable, List, Mapping, MutableMapping, Optional, Tuple
 
 import numpy as np
@@ -42,15 +27,13 @@ def add_coord(
 ) -> None:
     """Add a coordinate to table[(resid,resname)][name] with simple de-dup.
 
-    The pickle sometimes repeats the same atom/bead coordinates across multiple
-    oscillators. We keep the first coordinate unless a repeated occurrence differs
-    beyond `atol`, in which case we store the average.
+    The input sometimes repeats the same atom/bead coordinates across multiple oscillators. 
+    The first coordinate are kept unless a repeated occurrence differs beyond `atol`, in which case we store the average.
 
     Parameters
     ----------
     ignore_zeros:
-        If True, coordinates that are exactly (0,0,0) (within a small tolerance)
-        are treated as missing and ignored.
+        If True, coordinates that are exactly (0,0,0) (within a small tolerance) are treated as missing and ignored.
     """
     if coord is None:
         return
@@ -73,10 +56,6 @@ def add_coord(
 
 def canonical_backbone_atom_name(aname: str) -> Tuple[str, int]:
     """Return canonical PDB atom name + residue offset for backbone keys.
-
-    The oscillator graph uses names like "N_prev" and "CA_curr".
-    For PDB writing we map these to standard atom names ("N", "CA", ...),
-    and tell you whether they belong to residue 0 (prev) or residue 1 (curr).
 
     Returns
     -------
@@ -144,7 +123,7 @@ def build_per_residue_atomistic(
 
 
 def aggregate_atomistic_from_oscillators(oscillators: Iterable[Mapping]) -> Dict[ResKey, Dict[str, np.ndarray]]:
-    """Convenience wrapper: aggregate GT atomistic atoms from a mixed oscillator list.
+    """Convenience wrapper: aggregate ground truth atomistic atoms from a mixed oscillator list
 
     Parameters
     ----------
@@ -206,9 +185,7 @@ def aggregate_predicted_from_oscillator_predictions(
 ) -> Dict[ResKey, Dict[str, np.ndarray]]:
     """Aggregate predicted atom positions into a per-residue table.
 
-    This function assumes `pred_atom_pos_global` is ordered exactly like the
-    concatenation performed by :func:`backmap.data.collate.collate_graph_samples`:
-    atoms are appended sample-by-sample, preserving each sample's internal atom order.
+    This function assumes `pred_atom_pos_global` is ordered exactly like the concatenation performed by :func:`backmap.data.collate.collate_graph_samples`, i.e. atoms are appended sample-by-sample, preserving each sample's internal atom order.
     """
     pred_atom_pos_global = np.asarray(pred_atom_pos_global, dtype=float)
     pred_atoms: Dict[ResKey, Dict[str, np.ndarray]] = {}
@@ -288,7 +265,7 @@ def pdb_atom_line(
 ) -> str:
     """Format a PDB ATOM/HETATM line.
 
-    This is not a full PDB writer, but is sufficient for VMD and most viewers.
+    This is not a full PDB writer but is sufficient for VMD and most other visualization software.
     """
     if element is None:
         element = (name.strip()[0] if name.strip() else "C").upper()

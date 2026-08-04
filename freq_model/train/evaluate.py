@@ -431,10 +431,7 @@ def evaluate_protein_file(
 
     # Create a simple criterion for evaluation using config values
     criterion = SpectrumLoss(
-        lambda_peak=config.get('lambda_peak', 0.5),
-        lambda_correlation=config.get('lambda_correlation', 0.3),
         omega_grid=omega_grid_tensor,
-        peak_scale=100.0
     )
 
     with torch.no_grad():

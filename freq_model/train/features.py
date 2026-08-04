@@ -1,17 +1,9 @@
 """
 Feature extraction for oscillators.
-
-Implements:
-1. Local frame construction (CON plane, CO as z-axis)
-2. Neighbor finding with cutoff
-3. Spherical coordinate transformation
-4. Feature padding and masking
 """
 
 import numpy as np
-import torch
-from typing import Tuple, Dict, List
-from scipy.spatial.transform import Rotation
+from typing import Tuple, Dict
 from .data_utils import get_secondary_structure_from_rama
 
 

@@ -1,19 +1,6 @@
 from __future__ import annotations
 
-"""Per-batch metric extraction for plotting.
-
-Loss scalars are necessary but not sufficient to debug backmapping quality.
-This module extracts richer *distributions* from each batch so we can generate
-per-epoch diagnostic plots:
-
-- Dipole correlation histograms
-- Bond length pred vs true scatter + error hist
-- Angle/dihedral distributions (true vs pred)
-- Radial distance distribution (|x| in local)
-- Nonbonded minimum-distance and close-contact statistics
-- A simple "repulsion energy" proxy based on close contacts
-
-All computations are stable and avoid NaNs via clamping.
+"""Per-batch metric extraction for plotting
 """
 
 from dataclasses import dataclass
@@ -31,7 +18,7 @@ from backmap.model.pipeline import atoms_local_to_global
 class BatchMetrics:
     """A container for per-batch metric arrays.
 
-    All tensors are 1D float tensors on CPU (ready to accumulate and plot).
+    All tensors are 1D float tensors on CPU.
     Some fields may be empty tensors if the batch has no corresponding indices.
     """
 
@@ -122,10 +109,7 @@ def _nonbond_min_and_repulsion(
 ) -> Tuple[torch.Tensor, torch.Tensor]:
     """Compute per-sample minimum nonbonded distance and a repulsion proxy.
 
-    The repulsion proxy is the *sum* of ReLU(contact_r0 - r)^2 over nonbonded
-    pairs (i<j), returned per sample.
-
-    This is used for plots, not as a physical energy.
+    The repulsion proxy is the sum of ReLU(contact_r0 - r)^2 over nonbonded pairs (i<j), returned per sample.
     """
     B = int(atom_ptr.numel() - 1)
     min_d = []

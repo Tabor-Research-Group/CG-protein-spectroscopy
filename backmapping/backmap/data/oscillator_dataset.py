@@ -1,24 +1,15 @@
 from __future__ import annotations
 
-"""PyTorch dataset for oscillator-local backmapping.
+"""
+PyTorch dataset for oscillator-local backmapping.
 
-Each entry in your pickle is an *oscillator dictionary* (either backbone or
-sidechain). This dataset treats each oscillator as an independent sample and
-builds a small graph suitable for the BackmapGNN.
-
-Key robustness features
------------------------
-- NumPy 1.x / 2.x pickle compatibility (see :func:`backmap.data.io.load_pickle_numpy_compat`)
-- Deterministic ordering of oscillators (by folder/frame/oscillator_index when available)
-- Optional filtering / truncation for debug runs
-- Strong sanity checks to prevent silent Na==0 batches (which would yield zero loss)
-
-This dataset does **not** do the train/val/test split itself. Splitting is
-implemented at the DataLoader level (see :mod:`backmap.data.splits`).
+Each entry in the dataset pickle is an oscillator dictionary (either backbone or sidechain). 
+This dataset treats each oscillator as an independent sample and builds a small graph suitable for the BackmapGNN.
 """
 
 from dataclasses import dataclass
 from typing import Any, Dict, Iterable, List, Optional, Tuple
+from collections import defaultdict
 
 import torch
 from torch.utils.data import Dataset
@@ -119,7 +110,6 @@ class OscillatorDataset(Dataset):
 
     def _build_frame_groups(self) -> Dict[Tuple[str, int], List[int]]:
         """Build mapping from (folder, frame) -> list of oscillator indices."""
-        from collections import defaultdict
         frame_groups: Dict[Tuple[str, int], List[int]] = defaultdict(list)
         
         for idx, osc in enumerate(self.oscillators):

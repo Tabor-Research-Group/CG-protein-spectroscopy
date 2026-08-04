@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, Tuple
+from typing import Tuple
 
 import torch
 import torch.nn as nn
@@ -37,11 +37,9 @@ class EdgeCutoffs:
 class BackmapGNN(nn.Module):
     """Graph network that predicts per-atom local spherical coordinates.
 
-    Key design choice:
-      - All geometric edge direction features are expressed in the *receiver node's*
-        residue-local frame. This makes edge features invariant to global rotations,
-        while the overall mapping from CG geometry to atom positions is SE(3)-equivariant
-        because local frames rotate with the protein.
+    Notes
+    -----
+      All geometric edge direction features are expressed in the receiver node's residue-local frame. 
     """
 
     def __init__(
@@ -119,7 +117,7 @@ class BackmapGNN(nn.Module):
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """Return (pred_sph_atoms, pred_local_atoms).
 
-        pred_local_atoms are in the *atom's residue-local frame* relative to its BB origin.
+        pred_local_atoms are in the atom's residue-local frame relative to its BB origin.
         """
         if node_pos.ndim != 2 or node_pos.shape[-1] != 3:
             raise ValueError(f"node_pos must be [N,3], got {tuple(node_pos.shape)}")
@@ -187,8 +185,6 @@ class BackmapGNN(nn.Module):
 
         h = h + self.node_mlp(torch.cat([h, agg], dim=-1))
 
-        # Repeat layers (recompute edge geometry each layer? Invariant features depend on node_pos which changes only via diffusion input,
-        # not by the network. We keep them fixed within this forward for speed.)
         for _ in range(self.num_layers - 1):
             # messages based on updated h but same geometry
             h_src = h[src]

@@ -1,23 +1,11 @@
 """
-Publication-Quality Plotting Module for CG→Atomistic Backmapping
+Plotting Module for CG --> Atomistic Backmapping
 
-This module provides comprehensive visualization functions for evaluating diffusion model
-performance with publication-ready formatting.
-
-Key Improvements:
-1. Overlay histograms for direct comparison (not separate plots)
-2. Scatter plots with y=x identity line and R² statistics
-3. Uses ALL validation/test data (not just few batches)
-4. 300+ DPI resolution with proper fonts and styling
-5. Statistical reporting (KS test, RMSE, correlation)
-6. Multi-panel figures with shared formatting
-
-Author: Generated for scientific publication
-Date: December 2024
+This module provides comprehensive visualization functions for evaluating diffusion model performance.
 """
 
 from pathlib import Path
-from typing import Dict, Optional, Tuple, List
+from typing import Dict, List
 import json
 
 import numpy as np
@@ -27,7 +15,7 @@ from matplotlib import patches
 from scipy import stats
 
 # ============================================================================
-# Publication-Quality Plot Styling
+#   Plot Styling
 # ============================================================================
 
 def setup_publication_style():
@@ -684,9 +672,7 @@ def plot_epoch_metrics(
     bins: int = 60,
 ) -> Dict[str, Dict[str, float]]:
     """
-    Create complete set of publication-quality diagnostic plots for one epoch.
-    
-    This function REPLACES the existing plot_epoch_metrics() with improved versions.
+    Create complete set of diagnostic plots for one epoch.
     
     Args:
         out_dir: Output directory
@@ -871,4 +857,4 @@ if __name__ == "__main__":
     for key, val in stats.items():
         print(f"  {key}: {val:.4f}")
     
-    print("\nPublication-quality plot saved to: example_scatter.png")
+    print("\nPlot saved to: example_scatter.png")

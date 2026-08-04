@@ -25,33 +25,28 @@ ADVANCED METRICS (7):
 14. Ramachandran quality assessment (core/allowed/disallowed)
 15. Clash analysis (steric violations)
 
-All plots use:
-- Consistent font sizing (base + relative adjustments)
-- All-atom backbone coordinates where applicable
-- Clean, publication-ready layouts
-- Proper statistical reporting
-
-Author: Backmapping Project
-Date: 2025
 ================================================================================
 """
 
 import argparse
 import pickle
 import warnings
-from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Set
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
+from matplotlib.patches import Patch
 from matplotlib.gridspec import GridSpec
-from matplotlib.ticker import ScalarFormatter, MaxNLocator
+from matplotlib.ticker import ScalarFormatter, LogFormatterSciNotation
+from matplotlib.colors import LinearSegmentedColormap
+from matplotlib.lines import Line2D
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from scipy import stats
-from scipy.spatial.distance import cdist, euclidean
+from scipy.stats import gaussian_kde
+from scipy.spatial.distance import cdist
+from scipy.ndimage import gaussian_filter
 
 warnings.filterwarnings("ignore")
 
@@ -243,7 +238,7 @@ def extract_all_atoms_from_oscillator(osc: Dict, source: str = 'atoms') -> Tuple
     
     Args:
         osc: Oscillator dictionary
-        source: 'atoms' for GT or 'predicted_atoms' for predictions
+        source: 'atoms' for ground truth or 'predicted_atoms' for predictions
         
     Returns:
         Tuple of (gt_coords, pred_coords) as Nx3 arrays
@@ -286,7 +281,7 @@ def extract_per_frame_all_atom_rmsd(oscillators: List[Dict]) -> Tuple[List[float
     """Extract per-frame ALL-ATOM RMSD (backbone + sidechain).
     
     Groups oscillators by (folder, frame) and computes RMSD over ALL atoms
-    in the entire structure, not just backbone.
+    in the structure, not just backbone.
     
     Returns:
         rmsd_values: List of RMSD values (one per frame)
@@ -354,7 +349,7 @@ def extract_rama_angles(oscillators: List[Dict],
     
     Args:
         oscillators: List of oscillator dictionaries
-        source_field: 'rama_nnfs' for GT or 'predicted_rama_nnfs' for predictions
+        source_field: 'rama_nnfs' for ground truth or 'predicted_rama_nnfs' for predictions
         exclude_zero: If True, exclude terminal residues (angles = 0)
         
     Returns:
@@ -539,7 +534,6 @@ def extract_dipoles(oscillators: List[Dict],
 def plot_ramachandran_scatter(gt_angles: Tuple, pred_angles: Tuple, 
                               outpath: Path, dpi: int = 300):
     """4-panel Ramachandran scatter with 2D density coloring."""
-    from matplotlib.ticker import ScalarFormatter
     
     base_fs = plt.rcParams['font.size']
     
@@ -550,7 +544,6 @@ def plot_ramachandran_scatter(gt_angles: Tuple, pred_angles: Tuple,
     gs = GridSpec(1, 2, figure=fig, hspace=0.08, wspace=0.75,
                   left=0.08, right=0.95, top=0.90, bottom=0.15)
     
-    from matplotlib.colors import LinearSegmentedColormap
     viridis = plt.cm.viridis
     colors = viridis(np.linspace(0, 1, 256))
     colors[0] = [1, 1, 1, 1]
@@ -681,8 +674,6 @@ def plot_ramachandran_distributions(gt_angles: Tuple, pred_angles: Tuple,
 def plot_ramachandran_maps(gt_angles: Tuple, pred_angles: Tuple,
                           outpath: Path, dpi: int = 300):
     """Traditional Ramachandran φ vs ψ maps (2-panel, square aspect)."""
-    from matplotlib.ticker import ScalarFormatter
-    from mpl_toolkits.axes_grid1 import make_axes_locatable
     
     base_fs = plt.rcParams['font.size']
     
@@ -693,7 +684,6 @@ def plot_ramachandran_maps(gt_angles: Tuple, pred_angles: Tuple,
     gs = GridSpec(1, 2, figure=fig, hspace=0.08, wspace=0.75,
                   left=0.08, right=0.95, top=0.92, bottom=0.12)
     
-    from matplotlib.colors import LinearSegmentedColormap
     viridis = plt.cm.viridis
     colors = viridis(np.linspace(0, 1, 256))
     colors[0] = [1, 1, 1, 1]
@@ -766,15 +756,12 @@ def plot_ramachandran_maps(gt_angles: Tuple, pred_angles: Tuple,
     
     plt.savefig(outpath, dpi=dpi)
     plt.close()
-    print(f"✓ Saved: {outpath}")
+    print(f"  Saved: {outpath}")
 
 
 def plot_ramachandran_maps_contour(gt_angles: Tuple, pred_angles: Tuple,
                                    outpath: Path, dpi: int = 300):
     """Ramachandran φ vs ψ maps with smooth contours (2-panel, publication quality)."""
-    from matplotlib.ticker import ScalarFormatter
-    from mpl_toolkits.axes_grid1 import make_axes_locatable
-    from scipy.ndimage import gaussian_filter
     
     base_fs = plt.rcParams['font.size']
     
@@ -874,7 +861,7 @@ def plot_ramachandran_maps_contour(gt_angles: Tuple, pred_angles: Tuple,
     
     plt.savefig(outpath, dpi=dpi)
     plt.close()
-    print(f"✓ Saved: {outpath}")
+    print(f"  Saved: {outpath}")
 
 
 # TO BE CONTINUED...
@@ -928,7 +915,7 @@ def plot_bond_length_distributions(oscillators: List[Dict],
             ax.hist(pred_bonds, bins=bins, alpha=0.6, color=COLORS['orange'],
                     label=f'Pred (σ={pred_std:.3f} Å)', 
                     density=True, edgecolor='black', linewidth=0.5)
-        # Reference value line (NOT standard deviation!)
+        # Reference value line
         standard = standard_bonds[bond_name]
         ax.axvline(standard, color='red', linestyle='--', linewidth=2,
                    label=f'Reference ({standard:.2f} Å)')
@@ -942,7 +929,7 @@ def plot_bond_length_distributions(oscillators: List[Dict],
     plt.tight_layout(w_pad=3.5, h_pad=2.5)
     plt.savefig(outpath, dpi=dpi)
     plt.close()
-    print(f"✓ Saved: {outpath}")
+    print(f"  Saved: {outpath}")
 
 
 # =============================================================================
@@ -951,7 +938,6 @@ def plot_bond_length_distributions(oscillators: List[Dict],
 
 def plot_dipole_analysis(oscillators: List[Dict], outpath: Path, dpi: int = 300):
     """Dipole orientation histogram with KDE (combined only, log scale)."""
-    from matplotlib.ticker import LogFormatterSciNotation
     
     base_fs = plt.rcParams['font.size']
     
@@ -974,15 +960,13 @@ def plot_dipole_analysis(oscillators: List[Dict], outpath: Path, dpi: int = 300)
         
         bins = np.linspace(0, 180, 91)
         
-        # CRITICAL FIX: Set log scale BEFORE creating histogram
         ax.set_yscale('log')
         
-        # Create histogram (it will automatically handle log scale)
+        # Create histogram
         counts, bin_edges, patches = ax.hist(angles, bins=bins, color=COLORS['blue'], 
                                              alpha=0.7, edgecolor='black', linewidth=0.5)
         
         # Add KDE curve
-        from scipy.stats import gaussian_kde
         kde = gaussian_kde(angles)
         x_kde = np.linspace(0, 180, 500)
         y_kde = kde(x_kde)
@@ -1020,7 +1004,7 @@ def plot_dipole_analysis(oscillators: List[Dict], outpath: Path, dpi: int = 300)
     plt.tight_layout()
     plt.savefig(outpath, dpi=dpi)
     plt.close()
-    print(f"✓ Saved: {outpath}")
+    print(f"  Saved: {outpath}")
 
 def plot_dipole_analysis_linear(oscillators: List[Dict], outpath: Path, dpi: int = 300):
     """Dipole orientation histogram with KDE (combined only, linear scale)."""
@@ -1046,12 +1030,11 @@ def plot_dipole_analysis_linear(oscillators: List[Dict], outpath: Path, dpi: int
         
         bins = np.linspace(0, 180, 91)
         
-        # Create histogram (LINEAR SCALE - no set_yscale call)
+        # Create histogram
         counts, bin_edges, patches = ax.hist(angles, bins=bins, color=COLORS['blue'], 
                                              alpha=0.7, edgecolor='black', linewidth=0.5)
         
         # Add KDE curve
-        from scipy.stats import gaussian_kde
         kde = gaussian_kde(angles)
         x_kde = np.linspace(0, 180, 500)
         y_kde = kde(x_kde)
@@ -1086,7 +1069,7 @@ def plot_dipole_analysis_linear(oscillators: List[Dict], outpath: Path, dpi: int
     plt.tight_layout()
     plt.savefig(outpath, dpi=dpi)
     plt.close()
-    print(f"✓ Saved: {outpath}")
+    print(f"  Saved: {outpath}")
 
 # =============================================================================
 # PLOT 6: DIPOLE COMPONENT CORRELATIONS
@@ -1094,13 +1077,11 @@ def plot_dipole_analysis_linear(oscillators: List[Dict], outpath: Path, dpi: int
 
 def plot_dipole_components(oscillators: List[Dict], outpath: Path, dpi: int = 300):
     """3-panel x/y/z dipole component correlations."""
-    from matplotlib.ticker import ScalarFormatter
     
     base_fs = plt.rcParams['font.size']
     
     fig, axes = plt.subplots(1, 3, figsize=(15, 4.5))
     
-    from matplotlib.colors import LinearSegmentedColormap
     viridis = plt.cm.viridis
     colors = viridis(np.linspace(0, 1, 256))
     colors[0] = [1, 1, 1, 1]
@@ -1159,7 +1140,7 @@ def plot_dipole_components(oscillators: List[Dict], outpath: Path, dpi: int = 30
     plt.tight_layout()
     plt.savefig(outpath, dpi=dpi)
     plt.close()
-    print(f"✓ Saved: {outpath}")
+    print(f"  Saved: {outpath}")
 
 # =============================================================================
 # PLOT 7: PER-FRAME ALL-ATOM RMSD
@@ -1208,7 +1189,6 @@ def plot_rmsd_per_frame(oscillators: List[Dict], outpath: Path, dpi: int = 300):
                 fontsize=base_fs+2, pad=12)
     
     # Single legend entry with both mean and median
-    from matplotlib.lines import Line2D
     legend_elements = [
         Line2D([0], [0], color='red', linestyle='--', linewidth=2, 
                label=f'Mean: {mean_rmsd:.3f} Å'),
@@ -1226,7 +1206,7 @@ def plot_rmsd_per_frame(oscillators: List[Dict], outpath: Path, dpi: int = 300):
     plt.tight_layout()
     plt.savefig(outpath, dpi=dpi)
     plt.close()
-    print(f"✓ Saved: {outpath}")
+    print(f"  Saved: {outpath}")
     
     print(f"\nPer-Frame All-Atom RMSD Summary:")
     print(f"  Frames analyzed: {len(rmsd_values)}")
@@ -1373,7 +1353,7 @@ def plot_tm_score_distribution(oscillators: List[Dict], outpath: Path, dpi: int 
     plt.tight_layout()
     plt.savefig(outpath, dpi=dpi)
     plt.close()
-    print(f"✓ Saved: {outpath}")
+    print(f"  Saved: {outpath}")
 
 # =============================================================================
 # ADVANCED METRICS COMPLETE IMPLEMENTATION
@@ -1526,7 +1506,7 @@ def plot_gdt_ts_distribution(oscillators: List[Dict], outpath: Path, dpi: int = 
     plt.tight_layout()
     plt.savefig(outpath, dpi=dpi)
     plt.close()
-    print(f"✓ Saved: {outpath}")
+    print(f"  Saved: {outpath}")
 
 
 # =============================================================================
@@ -1686,7 +1666,7 @@ def plot_lddt_distribution(oscillators: List[Dict], outpath: Path, dpi: int = 30
     plt.tight_layout()
     plt.savefig(outpath, dpi=dpi)
     plt.close()
-    print(f"✓ Saved: {outpath}")
+    print(f"  Saved: {outpath}")
 
 
 # =============================================================================
@@ -1801,7 +1781,6 @@ def plot_contact_map_comparison(oscillators: List[Dict], outpath: Path, dpi: int
         axes[2].tick_params(labelsize=base_fs-1)
         
         # Legend
-        from matplotlib.patches import Patch
         legend_elements = [
             Patch(facecolor='green', label=f'TP: {metrics["tp"]}'),
             Patch(facecolor='red', label=f'FP: {metrics["fp"]}'),
@@ -1817,7 +1796,7 @@ def plot_contact_map_comparison(oscillators: List[Dict], outpath: Path, dpi: int
         plt.tight_layout()
         plt.savefig(outpath, dpi=dpi)
         plt.close()
-        print(f"✓ Saved: {outpath}")
+        print(f"  Saved: {outpath}")
         
     except Exception as e:
         print(f"[WARNING] Contact map plotting failed: {e}")
@@ -1915,7 +1894,7 @@ def plot_ramachandran_quality(gt_angles: Tuple, pred_angles: Tuple,
     plt.tight_layout()
     plt.savefig(outpath, dpi=dpi)
     plt.close()
-    print(f"✓ Saved: {outpath}")
+    print(f"  Saved: {outpath}")
 
 
 # =============================================================================
@@ -1923,7 +1902,7 @@ def plot_ramachandran_quality(gt_angles: Tuple, pred_angles: Tuple,
 # =============================================================================
 
 def detect_clashes(coords: np.ndarray, clash_cutoff: float = 2.0) -> Tuple[int, float]:
-    """Detect steric clashes (atoms too close).
+    """Detect steric clashes.
     
     Args:
         coords: Nx3 coordinate array
@@ -1951,7 +1930,7 @@ def detect_clashes(coords: np.ndarray, clash_cutoff: float = 2.0) -> Tuple[int, 
 
 
 def extract_per_frame_clashes(oscillators: List[Dict]) -> Tuple[List[int], List[int]]:
-    """Extract clash counts for GT and predicted structures."""
+    """Extract clash counts for ground truth and predicted structures."""
     frames = {}
     
     for osc in oscillators:
@@ -1995,7 +1974,7 @@ def extract_per_frame_clashes(oscillators: List[Dict]) -> Tuple[List[int], List[
 
 
 def plot_clash_analysis(oscillators: List[Dict], outpath: Path, dpi: int = 300):
-    """Plot clash comparison between GT and predicted structures."""
+    """Plot clash comparison between ground truth and predicted structures."""
     base_fs = plt.rcParams['font.size']
     
     fig, ax = plt.subplots(1, 1, figsize=(10, 6))
@@ -2044,54 +2023,7 @@ def plot_clash_analysis(oscillators: List[Dict], outpath: Path, dpi: int = 300):
     plt.tight_layout()
     plt.savefig(outpath, dpi=dpi)
     plt.close()
-    print(f"✓ Saved: {outpath}")
-
-
-# =============================================================================
-# UPDATED MAIN FUNCTION - ADD THESE LINES WHERE INDICATED
-# =============================================================================
-
-# In the main() function, after the TM-score plot, add these lines:
-
-"""
-    # Add after TM-score plot in main():
-    
-    if args.advanced_metrics:
-        print("\n" + "="*80)
-        print("GENERATING ADVANCED METRICS (7 total)")
-        print("="*80 + "\n")
-        
-        print(f"{plot_num}. TM-score distribution...")
-        plot_tm_score_distribution(data.oscillators,
-                                   output_dir / 'tm_score.png', dpi=args.dpi)
-        plot_num += 1
-        
-        print(f"{plot_num}. GDT-TS distribution...")
-        plot_gdt_ts_distribution(data.oscillators,
-                                output_dir / 'gdt_ts.png', dpi=args.dpi)
-        plot_num += 1
-        
-        print(f"{plot_num}. lDDT distribution...")
-        plot_lddt_distribution(data.oscillators,
-                              output_dir / 'lddt.png', dpi=args.dpi)
-        plot_num += 1
-        
-        print(f"{plot_num}. Contact map comparison...")
-        plot_contact_map_comparison(data.oscillators,
-                                   output_dir / 'contact_map.png', dpi=args.dpi)
-        plot_num += 1
-        
-        print(f"{plot_num}. Ramachandran quality assessment...")
-        if has_rama:
-            plot_ramachandran_quality(gt_angles, pred_angles,
-                                     output_dir / 'rama_quality.png', dpi=args.dpi)
-        plot_num += 1
-        
-        print(f"{plot_num}. Clash analysis...")
-        plot_clash_analysis(data.oscillators,
-                           output_dir / 'clash_analysis.png', dpi=args.dpi)
-        plot_num += 1
-"""
+    print(f"  Saved: {outpath}")
 
 
 # =============================================================================
@@ -2154,7 +2086,7 @@ Examples:
     
     data = load_pickle_files(Path(args.root), args.splits, args.pattern)
     
-    print(f"\n✓ Loaded {data.n_oscillators:,} oscillators from {data.n_files} files")
+    print(f"\n  Loaded {data.n_oscillators:,} oscillators from {data.n_files} files")
     
     # Extract angles
     print("\nExtracting Ramachandran angles...")
@@ -2260,8 +2192,8 @@ Examples:
     print("\n" + "="*80)
     print("COMPLETE")
     print("="*80)
-    print(f"\n✓ All plots saved to: {output_dir}")
-    print(f"✓ Font size {args.font_size} used consistently throughout\n")
+    print(f"\n  All plots saved to: {output_dir}")
+    print(f"  Font size {args.font_size} used consistently throughout\n")
 
 
 if __name__ == '__main__':

@@ -1,18 +1,9 @@
 from __future__ import annotations
 
-"""Graph construction from a single oscillator dictionary.
+"""
+Graph construction from a single oscillator dictionary.
 
-This module converts **one oscillator entry** from your pickle into a graph that
-can be batched and consumed by :class:`backmap.model.gnn.BackmapGNN`.
-
-Why oscillator-local graphs?
-----------------------------
-Your earlier training runs produced *all-zero* losses. The most common reason is
-that the model/loss pipeline is accidentally operating on an *empty atom set*
-(e.g., Na==0) or an empty mask. This builder enforces strong invariants:
-
-- At least one supervised atom must exist after filtering (Na>0)
-- Returned indices (bonds/angles/dihedrals/dipoles) are deterministic and stable
+This module converts one oscillator entry from the pickled dataset into a graph that can be batched and consumed by :class:`backmap.model.gnn.BackmapGNN`.
 
 Returned tensors
 ----------------
@@ -29,7 +20,7 @@ Each graph sample dict contains:
 
 Metadata (python objects)
 -------------------------
-We also include metadata needed for debugging and PDB writing:
+Metadata needed for debugging and PDB writing is also included:
 
 - meta_folder, meta_frame, meta_oscillator_index
 - meta_residue_keys: list[(resid:int, resname:str)] for each local residue
@@ -85,10 +76,10 @@ _BACKBONE_PDB_MAP: Dict[str, Tuple[str, int]] = {
 def canonical_pdb_atom_name(osc_type: str, atom_key: str) -> str:
     """Return a PDB-friendly atom name.
 
-    For backbone oscillators, the pickle uses "*_prev"/"*_curr" names; we map
+    For backbone oscillators, the input uses "*_prev"/"*_curr" names; map
     those to standard backbone atom names.
 
-    For sidechain oscillators, we keep the original atom name (CA, CB, CG, ...).
+    For sidechain oscillators, keep the original atom name (CA, CB, CG, ...).
     """
     if osc_type == "backbone" and atom_key in _BACKBONE_PDB_MAP:
         return _BACKBONE_PDB_MAP[atom_key][0]
@@ -119,7 +110,7 @@ class GraphVocab:
     def num_node_types(self) -> int:
         """Number of node type IDs.
 
-        We use a simple 2-type scheme:
+        Simple 2-type scheme:
         0 = bead node (BB/SC beads)
         1 = atom node
         """
@@ -191,7 +182,6 @@ def _build_topology(
     """Return (bonds, angles, dihedrals, dipoles) in atom-index space.
 
     - dipoles are stored as (C_idx, O_idx, N_idx) where N_idx may be -1
-      (we fill -1 later).
     """
     bonds: List[Tuple[int, int]] = []
     angles: List[Tuple[int, int, int]] = []
@@ -281,8 +271,8 @@ def _build_topology(
                 dipoles.append((c, o, int(n)))
 
         else:
-            # Unknown sidechain type. We still return empty topology and rely on
-            # denoising loss only.
+            # Unknown sidechain type
+            # Return empty topology and rely on denoising loss only
             pass
 
     return bonds, angles, diheds, dipoles
@@ -386,8 +376,7 @@ def build_graph_from_oscillator(
     bb_neighbor_prev, bb_neighbor_next = _extract_neighbor_beads(
         all_oscillators, current_osc_idx
     )
-    # For sidechain oscillators we keep a copy of the *true* BB bead position
-    # (bb_prev) even if we later choose to anchor the residue-local frame at SC1.
+    # For sidechain oscillators, keep a copy of the true BB bead position (bb_prev) even if later anchored in the residue-local frame at SC1.
     bb_prev_raw: Optional[torch.Tensor] = None
 
     if osc_type == "backbone":
@@ -430,17 +419,13 @@ def build_graph_from_oscillator(
     # Backbone oscillators:
     #   origin is BB bead(s) as usual.
     # Sidechain oscillators:
-    #   If SC1 exists, use **SC1 as the local origin**. This keeps sidechain atom
-    #   radii within the configured max_atom_radius (usually 6Å) and matches the
-    #   physical intent: sidechain atoms are naturally local to SC1.
-    #   We still include the BB bead as an input node, but we do not use it as
-    #   the origin for sidechain atom local coordinates.
+    #   If SC1 exists, use SC1 as the local origin.
+    #   The BB bead is still included as an input node
     if osc_type == "sidechain" and sc1_t is not None and torch.isfinite(sc1_t).all().item():
         # Anchor at SC1 for sidechains
         assert bb_prev_raw is not None
         bb_pos = sc1_t.unsqueeze(0)
-        # For N==1, compute_residue_local_frames will use this reference direction
-        # to build a deterministic frame.
+        # For N==1, compute_residue_local_frames will use this reference direction to build a deterministic frame.
         sc1_pos = bb_prev_raw.unsqueeze(0)
     else:
         # Anchor at BB (default)
@@ -510,7 +495,7 @@ def build_graph_from_oscillator(
 
     # Convert global → residue-local.
     # - Backbone oscillators: origin is the BB bead for each residue slot.
-    # - Sidechain oscillators: origin is SC1 when available (preferred), else BB.
+    # - Sidechain oscillators: origin is SC1 when available, else BB.
     origin = bb_pos[atom_res_local_t]
     R = bb_frames[atom_res_local_t]
     x0_local = global_to_local(atom_pos0, origin, R)  # [Na,3]
@@ -542,8 +527,7 @@ def build_graph_from_oscillator(
             if not _is_zero_pos(np.asarray(bb_neighbor_next)):
                 _add_bead("BB_neighbor", bb_neighbor_next, 1)
     else:
-        # For sidechain oscillators, bb_pos[0] may be anchored to SC1. Always add
-        # the actual BB bead position as the "BB" input node.
+        # For sidechain oscillators, bb_pos[0] may be anchored to SC1. Always add the actual BB bead position as the "BB" input node.
         _add_bead("BB", bb_prev_raw if bb_prev_raw is not None else bb_pos[0], 0)
         for i in range(1, max_sidechain_beads + 1):
             key = f"SC{i}"

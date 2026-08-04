@@ -1,14 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, Optional
+from typing import Dict
 
 import torch
 
 from backmap.geometry.dihedral import dihedral_angle, angle_to_sincos
 from backmap.geometry.spherical import cartesian_to_spherical_sincos
-from backmap.geometry.frames import global_to_local
-
 
 def _safe_norm(v: torch.Tensor, eps: float = 1e-8) -> torch.Tensor:
     return torch.sqrt(torch.clamp((v * v).sum(dim=-1), min=eps))
@@ -117,8 +115,7 @@ def coulomb_loss(
 ) -> torch.Tensor:
     """Electrostatic restraint: match long-range Coulomb energy (backbone only).
 
-    We exclude interactions within the same residue and immediate neighbors (|Δres| <= exclude_neighbor_residues),
-    as requested.
+    Interactions within the same residue and immediate neighbors are excluded to match ground truth spectroscopic map
     """
     if charged_idx.numel() < 2:
         return pred_global.new_tensor(0.0)
@@ -141,7 +138,7 @@ def coulomb_loss(
     i = torch.arange(q.shape[0], device=pred_global.device)
     j = i[:, None]
     ii = i[None, :]
-    # Actually create 2D indices
+    # Create 2D indices
     idx_i = torch.arange(q.shape[0], device=pred_global.device).view(-1, 1)
     idx_j = torch.arange(q.shape[0], device=pred_global.device).view(1, -1)
     upper = idx_j > idx_i
@@ -178,7 +175,7 @@ def dipole_loss(
         d = 0.665 * CO + 0.258 * CN
     where CO = O_i - C_i and CN = N_{i+1} - C_i.
 
-    We compare unit dipole vectors (cosine similarity) in the local frame of residue i BB.
+    Unit dipole vectors are compared in the local frame of residue i BB
     """
     if dip_C.numel() == 0:
         return pred_global.new_tensor(0.0)

@@ -1,15 +1,4 @@
 #!/usr/bin/env python3
-"""
-Inference Script with Hamiltonian and Dipole Export
-
-This script extends the corrected inference pipeline to export:
-1. Predicted Hamiltonians (H_diag + J_ij) - flattened matrices
-2. Ground Truth Hamiltonians (H_diag + J_ij) - flattened matrices
-3. Predicted Dipoles (x, y, z components separately)
-4. Ground Truth Dipoles (x, y, z components separately)
-
-Format for dipoles: frame_number [all x-components] [all y-components] [all z-components]
-"""
 
 import sys
 import os
@@ -98,15 +87,11 @@ def collate_fn_inference(batch: List[Dict]) -> Dict[str, torch.Tensor]:
     B = len(batch)
 
     # Initialize padded tensors
-    # IMPORTANT: Place padded atoms far away (z=1000 Å) so coupling J ∝ 1/r³ → 0
-    # BUT: C, O, N must be at DIFFERENT positions to avoid degenerate dipoles
     own_features = torch.zeros(B, max_N, F_own)
     neighbor_features = torch.zeros(B, max_N, max_K, F_neighbor)
     neighbor_mask = torch.zeros(B, max_N, max_K)
 
     # Place C, O, N at different positions to form a valid (but far away) amide group
-    # C at (0, 0, 1000), O at (1.2, 0, 1000), N at (0, 1.3, 1000)
-    # These form realistic C=O and C-N bond lengths (~1.2-1.3 Å)
     C_positions_pred = torch.zeros(B, max_N, 3)
     C_positions_pred[:, :, 2] = 1000.0  # C at z=1000
 
@@ -159,12 +144,7 @@ def inference_on_dataloader(
     gamma: float = 10.0,
 ) -> List[Dict]:
     """
-    Run inference on a dataloader - SAME AS EVALUATION IN TRAINING.
-
-    Uses EXACT same pipeline as training:
-    1. Batched processing with padding
-    2. Torch-based spectrum generation
-    3. Masking for padded oscillators
+    Run inference on a dataloader 
 
     Returns:
         List of result dictionaries, one per frame
@@ -179,7 +159,7 @@ def inference_on_dataloader(
 
     with torch.no_grad():
         for batch_idx, batch in enumerate(tqdm(data_loader, desc='Inference')):
-            # Move to device - SAME as training
+            # Move to device
             own_features = batch['own_features'].to(device)
             neighbor_features = batch['neighbor_features'].to(device)
             neighbor_mask = batch['neighbor_mask'].to(device)
@@ -189,23 +169,23 @@ def inference_on_dataloader(
             oscillator_mask = batch['oscillator_mask'].to(device)
             frame_indices = batch['frame_indices']
 
-            # Forward pass: predict H_diag - SAME as training
+            # Forward pass: predict H_diag
             H_diag_pred = model(own_features, neighbor_features, neighbor_mask)
 
-            # Calculate dipoles - SAME as training
+            # Calculate dipoles
             dipoles_pred = calculate_torii_dipole_batch_torch(
                 C_positions_pred, O_positions_pred, N_positions_pred
             )
 
-            # Calculate couplings for predicted - SAME as training (WITH MASK!)
+            # Calculate couplings for predicted
             J_matrix_pred = calculate_tasumi_coupling_batch_torch(
                 dipoles_pred, C_positions_pred, oscillator_mask
             )
 
-            # Generate IR spectrum - SAME as training (WITH MASK!)
+            # Generate IR spectrum
             spectrum_pred = batch_generate_spectra_torch(
                 H_diag_pred, J_matrix_pred, dipoles_pred,
-                mask_batch=oscillator_mask,  # CRITICAL: masking for padded oscillators
+                mask_batch=oscillator_mask,
                 omega_min=omega_min,
                 omega_max=omega_max,
                 omega_step=omega_step,
@@ -229,7 +209,7 @@ def inference_on_dataloader(
                 }
                 results.append(result)
 
-    print(f"✓ Inference complete: {len(results)} frames processed")
+    print(f" Inference complete: {len(results)} frames processed")
     return results
 
 
@@ -265,9 +245,9 @@ def save_results(results: List[Dict], output_dir: Path):
                 for r in results:
                     f.write(f"{r['frame_idx']}: {len(r['H_diag_pred'])}\n")
 
-        print(f"  ✓ Saved oscillator_info.txt (N={N_oscillators}{'*' if not is_constant else ''})")
+        print(f"    Saved oscillator_info.txt (N={N_oscillators}{'*' if not is_constant else ''})")
 
-    # Save Predicted Full Hamiltonian matrices (H_diag + J_matrix)
+    # Save Predicted Full Hamiltonian matrices
     # Format: NISE-compatible upper triangular (row by row: diagonal + upper triangle)
     with open(output_dir / 'hamiltonians_predicted.dat', 'w') as f:
         for result in results:
@@ -296,7 +276,7 @@ def save_results(results: List[Dict], output_dir: Path):
             for val in hamiltonian_values:
                 line += f" {val:.6f}"
             f.write(line + "\n")
-    print(f"  ✓ Saved hamiltonians_predicted.dat (NISE-compatible upper triangular format)")
+    print(f"    Saved hamiltonians_predicted.dat")
 
     # Save Predicted Dipoles (x, y, z components)
     with open(output_dir / 'dipoles_predicted.dat', 'w') as f:
@@ -321,7 +301,7 @@ def save_results(results: List[Dict], output_dir: Path):
                 line += f" {dipoles[i, 2]:.6f}"
 
             f.write(line + "\n")
-    print(f"  ✓ Saved dipoles_predicted.dat (frame_number x-components y-components z-components)")
+    print(f"    Saved dipoles_predicted.dat (frame_number x-components y-components z-components)")
 
     # Save spectra
     with open(output_dir / 'spectra.dat', 'w') as f:
@@ -333,50 +313,10 @@ def save_results(results: List[Dict], output_dir: Path):
 
             for freq, int_pred in zip(omega, spec_pred):
                 f.write(f"{frame_idx} {freq:.2f} {int_pred:.6f}\n")
-    print(f"  ✓ Saved spectra.dat")
-
-
-def plot_spectra_comparison(results: List[Dict], output_dir: Path, max_plots: int = 9):
-    """Plot individual frame spectra comparisons."""
-    n_plots = min(len(results), max_plots)
-    n_cols = int(np.ceil(np.sqrt(n_plots)))
-    n_rows = int(np.ceil(n_plots / n_cols))
-
-    fig, axes = plt.subplots(n_rows, n_cols, figsize=(5*n_cols, 4*n_rows))
-    if n_plots == 1:
-        axes = [axes]
-    else:
-        axes = axes.flatten()
-
-    for idx in range(n_plots):
-        ax = axes[idx]
-        result = results[idx]
-
-        omega = result['omega_grid']
-        spec_pred = result['spectrum_pred']
-        frame_idx = result['frame_idx']
-
-        # Plot - updated labels
-        ax.plot(omega, spec_pred, 'r--', linewidth=2, label='CG')
-
-        ax.set_xlabel('Frequency (cm⁻¹)', fontweight='bold')
-        ax.set_ylabel('Normalized Intensity', fontweight='bold')
-        ax.set_title(f'Frame {frame_idx}', fontweight='bold')
-        ax.set_xlim(1500, 1750)
-        ax.set_ylim(0, 1.05)
-
-    # Hide unused subplots
-    for idx in range(n_plots, len(axes)):
-        axes[idx].axis('off')
-
-    plt.tight_layout()
-    plt.savefig(output_dir / 'spectra.png', dpi=300, bbox_inches='tight')
-    plt.close()
-    print(f"  ✓ Saved spectra.png")
-
+    print(f"    Saved spectra.dat")
 
 def main():
-    parser = argparse.ArgumentParser(description='Corrected Inference - Matches Training Pipeline')
+    parser = argparse.ArgumentParser(description='CG-Only Inference')
     parser.add_argument('--config', type=str, required=True, help='Path to inference config JSON')
     args = parser.parse_args()
 
@@ -385,7 +325,7 @@ def main():
         config = json.load(f)
 
     print("\n" + "="*80)
-    print("CORRECTED INFERENCE - MATCHES TRAINING PIPELINE")
+    print("INFERENCE")
     print("="*80)
     print(f"\nConfiguration: {args.config}")
 
@@ -416,7 +356,7 @@ def main():
     model.to(device)
     model.eval()
 
-    print(f"✓ Model loaded from: {config['model_path']}")
+    print(f" Model loaded from: {config['model_path']}")
     print(f"  Parameters: {sum(p.numel() for p in model.parameters()):,}")
     print(f"  Energy scaling: [{model.output_head.min_energy:.1f}, {model.output_head.max_energy:.1f}] cm⁻¹")
 
@@ -431,7 +371,7 @@ def main():
     max_frames = config.get('max_frames', len(all_frame_indices))
     frame_indices = all_frame_indices[:max_frames]
 
-    print(f"✓ Selected {len(frame_indices)} frames for inference")
+    print(f" Selected {len(frame_indices)} frames for inference")
 
     # Create dataset
     dataset = InferenceDataset(
@@ -451,12 +391,12 @@ def main():
         batch_size=config.get('batch_size', 4),  # Can adjust batch size for inference
         shuffle=False,
         num_workers=config.get('num_workers', 0),  # Multiprocessing for data loading
-        collate_fn=collate_fn_inference  # CRITICAL: Same padding as training!
+        collate_fn=collate_fn_inference 
     )
 
-    print(f"✓ Created dataloader with {len(data_loader)} batches")
+    print(f" Created dataloader with {len(data_loader)} batches")
 
-    # Run inference - SAME PIPELINE AS TRAINING EVALUATION
+    # Run inference
     results = inference_on_dataloader(
         model=model,
         data_loader=data_loader,
@@ -473,8 +413,6 @@ def main():
     print("="*80)
 
     save_results(results, output_dir)
-    plot_spectra_comparison(results, output_dir, max_plots=config.get('max_plots', 9))
-    # plot_average_spectrum() removed - not applicable for randomly sampled frames
 
     # Print summary statistics
     print("\n" + "="*80)
@@ -487,10 +425,10 @@ def main():
     print(f"\nAll results saved to: {output_dir}")
     print("\nKey insight: This inference script now uses EXACTLY the same")
     print("computational pipeline as training, including:")
-    print("  ✓ Batched processing with padding")
-    print("  ✓ Torch-based spectrum generation")
-    print("  ✓ Oscillator masking for padded atoms")
-    print("  ✓ Same coupling calculation")
+    print("   Batched processing with padding")
+    print("   Torch-based spectrum generation")
+    print("   Oscillator masking for padded atoms")
+    print("   Same coupling calculation")
     print("\nResults should now match training validation perfectly!")
 
 

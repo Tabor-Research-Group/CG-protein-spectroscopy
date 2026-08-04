@@ -1,12 +1,8 @@
 #!/usr/bin/env python3
 """
-Validate the oscillator pickle dataset used for backmapping training.
+Validate the pickled oscillator dataset used for backmapping training.
 
-This script is intentionally *structurally aware*:
-- Backbone oscillators use bb_curr/bb_next anchors and atom names with _prev/_curr suffixes.
-- Sidechain oscillators use bb_prev anchor (single-residue) and atom names without suffixes.
-
-It checks:
+Checks:
 - Non-finite coordinates (BB anchors and atoms)
 - Zero "sentinel" coordinates (required vs optional)
 - Atom radii relative to the correct BB anchor bead(s)
@@ -28,9 +24,9 @@ import numpy as np
 
 # Prefer the project's numpy-compat loader when available
 try:
-    from backmap.data.io import load_pickle_numpy_compat  # type: ignore
-except Exception:  # pragma: no cover
-    load_pickle_numpy_compat = None  # type: ignore
+    from backmap.data.io import load_pickle_numpy_compat
+except Exception:
+    load_pickle_numpy_compat = None
 
 
 def _as_np3(x: Any) -> np.ndarray:
@@ -78,7 +74,7 @@ def _infer_oscillator_type(entry: Dict[str, Any], outer_res_name: str) -> str:
     """
     Return "backbone" or "sidechain".
 
-    We prefer entry["oscillator_type"] when present; otherwise use heuristics.
+    Prefer entry["oscillator_type"] when present; otherwise use heuristics.
     """
     t = entry.get("oscillator_type")
     if isinstance(t, str) and t.strip():
@@ -112,7 +108,7 @@ class Anchors:
     bb_pos: List[np.ndarray]
     ok: bool
     osc_type: str
-    anchor_field: str  # which field was used as the primary BB anchor for slot 0 (sidechain) or for bb_curr (backbone)
+    anchor_field: str  # field used as the primary BB anchor for slot 0 (sidechain) or for bb_curr (backbone)
 
 
 def _get_bb_anchors(entry: Dict[str, Any], osc_type: str, *, sidechain_anchor: str = "sc1") -> Anchors:
@@ -124,7 +120,7 @@ def _get_bb_anchors(entry: Dict[str, Any], osc_type: str, *, sidechain_anchor: s
     Sidechain:
       bb_pos = [bb_prev]          (single residue)
 
-    We also support limited fallbacks for older/variant pickles:
+    Also supports limited fallbacks for variant pickles:
     - sidechain: bb_prev -> bb_curr -> cg_bead (only if cg_bead_type == "BB")
     """
     if osc_type == "backbone":
@@ -135,8 +131,7 @@ def _get_bb_anchors(entry: Dict[str, Any], osc_type: str, *, sidechain_anchor: s
 
     # sidechain
     #
-    # Prefer anchoring at SC1 (center bead for sidechain predictions) when available.
-    # This matches how the training code constructs sidechain-local frames.
+    # Prefer anchoring at SC1 when available.
     sidechain_anchor = (sidechain_anchor or "sc1").strip().lower()
     if sidechain_anchor not in {"sc1", "bb_prev"}:
         sidechain_anchor = "sc1"
@@ -202,7 +197,7 @@ def main() -> None:
         default="sc1",
         choices=["sc1", "bb_prev"],
         help=(
-            "Which anchor to use for sidechain oscillators when computing radii. "
+            "Anchor to use for sidechain oscillators when computing radii. "
             "'sc1' (recommended) anchors at sc_beads['SC1'] when available; "
             "'bb_prev' anchors at bb_prev (legacy)."
         ),
@@ -216,7 +211,7 @@ def main() -> None:
     # Load (prefer compat loader if present)
     if load_pickle_numpy_compat is not None:
         data = load_pickle_numpy_compat(pkl_path)
-    else:  # pragma: no cover
+    else:
         import pickle
         data = pickle.loads(pkl_path.read_bytes())
 
@@ -266,7 +261,7 @@ def main() -> None:
     sc_ca_to_sc1: List[float] = []
     sc_ca_to_anchor: List[float] = []
 
-    # Per-residue counters (keyed by *outer residue name*, string)
+    # Per-residue counters (keyed by outer residue name, string)
     by_res = defaultdict(
         lambda: {
             "n_entries": 0,

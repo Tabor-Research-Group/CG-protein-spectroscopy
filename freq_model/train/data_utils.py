@@ -1,16 +1,10 @@
 """
 Data loading and preprocessing utilities.
-
-Handles:
-1. Loading PKL files
-2. Extracting oscillator data
-3. Organizing by frames
-4. Computing CO/CN vectors for dipole calculation
 """
 
 import pickle
 import numpy as np
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Tuple
 from pathlib import Path
 from collections import defaultdict
 

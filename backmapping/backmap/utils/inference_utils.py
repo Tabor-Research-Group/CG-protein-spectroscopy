@@ -2,12 +2,10 @@
 Shared Inference Utilities
 
 Common functions used by both robust and fast inference scripts:
-- Ramachandran angle calculation (MDAnalysis-consistent)
+- Ramachandran angle calculation
 - Plotting functions
 - Result aggregation
 - File I/O utilities
-
-This avoids code duplication between infer_robust.py and infer_fast.py.
 """
 
 from __future__ import annotations
@@ -15,6 +13,8 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
+import matplotlib.pyplot as plt
+from scipy import stats
 
 try:
     from MDAnalysis.lib.distances import calc_dihedrals
@@ -25,7 +25,7 @@ except ImportError:
 
 
 # ============================================================================
-# Ramachandran Angle Calculation (MDAnalysis-consistent)
+# Ramachandran Angle Calculation
 # ============================================================================
 
 def compute_phi_psi_from_oscillators(
@@ -33,10 +33,6 @@ def compute_phi_psi_from_oscillators(
 ) -> Tuple[Dict[int, float], Dict[int, float], Optional[int], Optional[int]]:
     """
     Compute φ/ψ angles for all residues from backbone oscillators.
-    
-    Uses MDAnalysis-consistent dihedral definitions:
-        φ(i) = dihedral(C_{i-1}, N_i, CA_i, C_i)
-        ψ(i) = dihedral(N_i, CA_i, C_i, N_{i+1})
     
     Args:
         backbone_oscillators: List of backbone oscillator dicts
@@ -251,11 +247,6 @@ def add_predicted_rama_angles_to_oscillators(
             }
             continue
         
-        # Build predicted atom dict with CORRECT naming convention
-        # predicted_atoms structure: {(resid, resname): {'CA': coord, 'C': coord, ...}}
-        # We need to map to: C_prev, O_prev, CA_prev, N_prev (from bb_curr_key)
-        #                    N_curr, H_curr, CA_curr (from bb_next_key)
-        
         pred_atoms = {}
         
         # Get atoms from bb_curr (residue i) → map to _prev
@@ -362,12 +353,6 @@ def plot_ramachandran_comparison(
     1. Scatter plots (pred vs true) for each angle
     2. Distribution overlays for each angle
     """
-    try:
-        import matplotlib.pyplot as plt
-        from scipy import stats
-    except ImportError:
-        print("WARNING: matplotlib or scipy not found. Skipping plots.")
-        return
     
     angle_names = ["phi_N", "psi_N", "phi_C", "psi_C"]
     angle_labels = {
@@ -491,11 +476,6 @@ def plot_ramachandran_prediction_only(
     title_prefix: str = "",
 ):
     """Plot Ramachandran distributions for predicted angles (no ground truth)."""
-    try:
-        import matplotlib.pyplot as plt
-    except ImportError:
-        print("WARNING: matplotlib not found. Skipping plots.")
-        return
     
     angle_names = ["phi_N", "psi_N", "phi_C", "psi_C"]
     angle_labels = {

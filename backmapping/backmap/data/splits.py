@@ -1,21 +1,13 @@
 from __future__ import annotations
 
-"""Train/val/test splits.
-
-The *recommended* split for this project is by **protein folder** (i.e., leave
-whole proteins out of training). This prevents leakage across frames of the same
-protein.
-
-However, tiny debug pickles sometimes contain only 1 folder. In that case, a
-folder split would yield empty val/test sets. To keep pipelines debuggable, we
-provide a deterministic fallback to a random split by oscillator index.
+"""
+Train/val/test splits.
 """
 
 from dataclasses import dataclass
-from typing import Iterable, List, Sequence, Tuple
+from typing import List, Sequence, Tuple
 
 import numpy as np
-
 
 @dataclass(frozen=True)
 class Split:
@@ -108,8 +100,7 @@ def split_indices(
         val_idx = [i for i, f in enumerate(folders_by_index) if f in val_set]
         test_idx = [i for i, f in enumerate(folders_by_index) if f in test_set]
 
-        # If the dataset is tiny (e.g., only 1 folder), fallback so the pipeline
-        # still has something to validate/test.
+        # If the dataset is tiny (e.g., only 1 folder), fallback so the pipeline still has something to validate/test.
         if (
             len(train_idx) < min_items_per_split
             or len(val_idx) < min_items_per_split

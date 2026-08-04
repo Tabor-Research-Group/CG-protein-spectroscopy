@@ -6,13 +6,13 @@ from typing import Dict, List, Optional, Sequence, Tuple
 import numpy as np
 
 
-# -----------------------------------------------------------------------------
-# Atom name conventions used in the pickle:
+# -------------------------------------------------------
+# Atom name conventions:
 # - backbone atoms are stored under names "N", "CA", "C", "O", "H" after reconstruction
 # - GLN/ASN sidechain atoms follow standard PDB atom names (CA, CB, CG, ...)
-# -----------------------------------------------------------------------------
+# -------------------------------------------------------
 
-# Backbone (peptide) bonds within a residue i (when atoms exist)
+# Backbone bonds within a residue i
 BACKBONE_BONDS_INTRA = [
     ("N", "CA"),
     ("CA", "C"),
@@ -74,8 +74,8 @@ ASN_ANGLES = [
 ]
 
 
-# Fixed partial charges for backbone atoms (AMBER-like, internal residues).
-# Used only for long-range electrostatic restraint across non-neighbor residues.
+# Partial charges for backbone atoms (AMBER-like, internal residues)
+# Used only for long-range electrostatic restraint across non-neighbor residues
 BACKBONE_PARTIAL_CHARGES = {
     "C": 0.5973,
     "O": -0.5679,
@@ -258,7 +258,7 @@ def build_topology_indices(
             rama_res.append(int(i))
 
     # Note: phi_list and psi_list may not align in length if missing atoms.
-    # We'll compute losses with independent masks.
+    # Losses are computed with independent masks.
 
     return TopologyIndices(
         bond_pairs=np.asarray(bonds, dtype=np.int64) if bonds else np.zeros((0, 2), dtype=np.int64),

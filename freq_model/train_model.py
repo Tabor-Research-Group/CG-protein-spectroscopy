@@ -71,11 +71,6 @@ def parse_args():
     training_group.add_argument('--weight_decay', type=float, default=1e-5, help='Weight decay')
     training_group.add_argument('--num_workers', type=int, default=4, help='Number of data loading workers')
 
-    # Loss (multi-component spectrum loss)
-    loss_group = parser.add_argument_group('Loss Function Parameters')
-    loss_group.add_argument('--lambda_peak', type=float, default=0.5, help='Peak position loss weight')
-    loss_group.add_argument('--lambda_correlation', type=float, default=0.3, help='Correlation loss weight')
-
     # Physics
     physics_group = parser.add_argument_group('Physics-Based Parameters')
     physics_group.add_argument('--cutoff', type=float, default=20.0, help='Neighbor cutoff (Angstroms)')
@@ -190,7 +185,7 @@ def main():
     train_frames_dict = organize_by_frames(train_data)
     test_frames_dict = organize_by_frames(test_data)
 
-    # Filter frames by quality (v9 addition)
+    # Filter frames by quality
     print("="*80)
     print("FILTERING FRAMES BY QUALITY")
     print("="*80)
@@ -235,7 +230,7 @@ def main():
         print("\n" + "="*80)
         print("CLUSTERING TEST SPECTRA")
         print("="*80)
-        # Unpack all 5 return values (even if we don't use labels/indices for test)
+        # Unpack all 5 return values
         test_frame_indices, test_all_spectra, _, _, _ = generate_and_cluster_spectra(
             test_frames_dict,
             n_clusters=args.n_clusters // 2,  # Fewer clusters for test
@@ -311,8 +306,8 @@ def main():
         'dim_feedforward': args.dim_feedforward,
         'dropout': args.dropout,
         'max_neighbors': args.max_neighbors,
-        'min_energy': 1450.0,  # Widened from 1500.0 to allow learning of low-energy sites
-        'max_energy': 1850.0,  # Widened from 1800.0 to capture high-frequency components
+        'min_energy': 1450.0,
+        'max_energy': 1850.0,
     }
 
     # Use fixed model with constrained output to prevent eigenvalue decomposition failures
@@ -339,17 +334,14 @@ def main():
             print(f"WARNING: {below_min_test} test energies below min, {above_max_test} above max")
 
         if below_min_train == 0 and above_max_train == 0 and below_min_test == 0 and above_max_test == 0:
-            print(f"✓ Model constraints fully cover ground truth range")
+            print(f"  Model constraints fully cover ground truth range")
 
     # Frequency grid (create before loss)
     omega_grid_tensor = torch.from_numpy(omega_grid).float().to(device)
 
-    # Loss and optimizer (with improved multi-component loss and scaling)
+    # Loss and optimizer
     criterion = SpectrumLoss(
-        lambda_peak=args.lambda_peak,
-        lambda_correlation=args.lambda_correlation,
         omega_grid=omega_grid_tensor,
-        peak_scale=100.0  # Scale peak loss: 100 cm^-1 difference -> loss of 1.0
     )
 
     optimizer = optim.AdamW(
@@ -358,11 +350,6 @@ def main():
         weight_decay=args.weight_decay
     )
 
-    # Learning rate scheduler: CONSTANT (no warmup!)
-    # CRITICAL FIX: Warmup was causing model to regress to mean predictions
-    # First epoch works well, then LR increases → model overshoots → predicts mean
-    # Solution: Keep LR constant and low throughout training
-
     steps_per_epoch = len(train_loader)
     total_steps = args.epochs * steps_per_epoch
 
@@ -370,7 +357,6 @@ def main():
     print(f"  Mode: CONSTANT (no warmup, no decay)")
     print(f"  Learning rate: {args.lr:.2e} (constant throughout)")
     print(f"  Total steps: {total_steps}")
-    print(f"  Reason: Warmup was causing regression to mean predictions")
 
     # Constant LR (return 1.0 always)
     def lr_lambda(current_step):
@@ -478,14 +464,14 @@ def main():
                 model, optimizer, epoch, train_metrics, test_metrics,
                 output_dir / 'best_model.pt'
             )
-            print(f"  → New best model saved (corr: {best_test_corr:.4f}, improvement: {improvement:.4f})")
+            print(f"  New best model saved (corr: {best_test_corr:.4f}, improvement: {improvement:.4f})")
 
             if args.early_stopping:
                 epochs_without_improvement = 0
         else:
             if args.early_stopping:
                 epochs_without_improvement += 1
-                print(f"  → No improvement ({epochs_without_improvement}/{args.patience})")
+                print(f"  No improvement ({epochs_without_improvement}/{args.patience})")
 
         # Early stopping check
         if args.early_stopping and epochs_without_improvement >= args.patience:
@@ -504,8 +490,6 @@ def main():
                 **model_config,  # Include model config
                 'cutoff': args.cutoff,  # Add cutoff from args
                 'max_neighbors': args.max_neighbors,  # Already in model_config but make sure
-                'lambda_peak': args.lambda_peak,
-                'lambda_correlation': args.lambda_correlation
             }
 
             per_protein_metrics = evaluate_per_protein(
@@ -569,7 +553,7 @@ def main():
                     combined_dir / 'site_energy_comparison.png',
                     max_samples=5
                 )
-                print(f"    ✓ Combined plots saved to {combined_dir}/")
+                print(f"    Combined plots saved to {combined_dir}/")
 
             # Plot 2: Per-protein plots (each protein separately)
             if args.track_per_protein and val_files_data:
@@ -583,8 +567,6 @@ def main():
                     **model_config,
                     'cutoff': args.cutoff,
                     'max_neighbors': args.max_neighbors,
-                    'lambda_peak': args.lambda_peak,
-                    'lambda_correlation': args.lambda_correlation
                 }
 
                 for protein_id, protein_data in val_files_data.items():
@@ -758,8 +740,6 @@ def main():
                 **model_config,
                 'cutoff': args.cutoff,
                 'max_neighbors': args.max_neighbors,
-                'lambda_peak': args.lambda_peak,
-                'lambda_correlation': args.lambda_correlation
             }
 
             results = evaluate_protein_file(

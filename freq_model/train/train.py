@@ -1,12 +1,3 @@
-"""
-Loss = λ_corr × (1 - Pearson_correlation) + λ_mse × MSE
-
-Rationale:
-- Correlation ensures shape similarity (robust to small shifts)
-- MSE ensures proper alignment (prevents shifts)
-- Both naturally similar magnitude for normalized spectra (no complex balancing needed)
-"""
-
 import random
 import torch
 import torch.nn as nn
@@ -28,28 +19,16 @@ class SpectrumLoss(nn.Module):
     """
     Simple, scientifically sound loss function for IR spectrum matching.
 
-    Loss = λ_corr × (1 - Pearson_correlation) + λ_mse × MSE
-
-    Design principles:
-    1. Correlation captures shape similarity (robust to small shifts)
-    2. MSE captures alignment and intensity (prevents shifts)
-    3. Both naturally similar magnitude for normalized spectra
-    4. No complicated peak matching (unreliable with overlapping peaks)
-    5. No multi-scale smoothing (can cause unintended shifts)
+    Loss = λ_corr × (1 - Pearson_correlation) + λ_mse × MSE(spectra) + λ_grad × MSE(gradients)
 
     Args:
-        lambda_peak: Weight for correlation loss (default: 1.0, ignores input value)
-        lambda_correlation: Weight for MSE loss (default: 1.0, ignores input value)
         omega_grid: Frequency grid (kept for compatibility, not used in loss)
-        peak_scale: Peak scale (kept for compatibility, not used in loss)
+loss)
     """
 
     def __init__(
         self,
-        lambda_peak: float = 0.5,
-        lambda_correlation: float = 0.3,
         omega_grid: torch.Tensor = None,
-        peak_scale: float = 100.0
     ):
         super().__init__()
         # Fixed weights for optimal balance
@@ -57,9 +36,7 @@ class SpectrumLoss(nn.Module):
         self.lambda_mse = 1.0        # Weight for MSE loss
         self.lambda_grad = 500.0       # Weight for gradient loss (prevents flat/mean predictions)
 
-        # Keep these for compatibility
         self.register_buffer('omega_grid', omega_grid)
-        self.peak_scale = peak_scale
 
         print(f"\n  SpectrumLoss initialized:")
         print(f"    Loss = {self.lambda_corr:.1f} × (1 - corr) + {self.lambda_mse:.1f} × MSE + {self.lambda_grad:.1f} × Gradient_MSE")
@@ -137,8 +114,6 @@ class SpectrumLoss(nn.Module):
         # 4. Total loss (weighted combination)
         loss_total = self.lambda_corr * loss_corr + self.lambda_mse * loss_mse + self.lambda_grad * loss_grad
       
-       # loss_total = self.lambda_mse * loss_mse 
-
         # Prepare loss dictionary
         loss_dict = {
             'total': loss_total.item(),

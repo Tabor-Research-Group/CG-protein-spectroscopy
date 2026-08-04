@@ -2,14 +2,9 @@ from __future__ import annotations
 
 """Collation utilities for oscillator-local graphs.
 
-The model operates on graphs containing both **bead nodes** and **atom nodes**.
-Each dataset sample is a small graph (typically ~5-20 nodes). A DataLoader
-batch concatenates these small graphs into one larger disjoint graph.
-
-This is historically a frequent source of subtle bugs:
-- edge_index offset mistakes
-- mixing of atom index space (0..Na-1 per sample) vs node index space (0..Nn-1)
-- forgetting to offset residue indices used to index bb_pos / bb_frames
+The model operates on graphs containing both bead nodes and atom nodes.
+Each dataset sample is a small graph (typically ~5-20 nodes). 
+A DataLoader batch concatenates these small graphs into one larger disjoint graph.
 
 To prevent silent failures (e.g. producing Na_total=0 and therefore zero losses),
 this collate function performs strict sanity checks.

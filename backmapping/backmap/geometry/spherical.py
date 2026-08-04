@@ -1,20 +1,12 @@
 from __future__ import annotations
 
-from typing import Tuple
-
 import torch
-
 
 def cartesian_to_spherical_sincos(
     v: torch.Tensor,
     eps: float = 1e-8,
 ) -> torch.Tensor:
     """Convert cartesian vectors to (r, cosθ, sinθ, cosφ, sinφ).
-
-    Convention (in local coordinates):
-      - r = ||v||
-      - θ: polar angle from +z axis
-      - φ: azimuth angle in x-y plane from +x axis
 
     Returns
     -------

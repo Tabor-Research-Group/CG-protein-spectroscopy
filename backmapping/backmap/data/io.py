@@ -1,17 +1,7 @@
 from __future__ import annotations
 
-"""I/O utilities.
-
-The provided datasets are Python pickles that may contain NumPy arrays.
-
-Important:
-  * Pickles created under NumPy 2.x may reference the module path
-    `numpy._core`, which does not exist in NumPy 1.x.
-  * If you unpickle such a file under NumPy 1.x, you will see:
-        ModuleNotFoundError: No module named 'numpy._core'
-
-This module provides a safe loader that patches module aliases so the same
-pickle can be loaded on NumPy 1.x and 2.x.
+"""
+I/O utilities.
 """
 
 from typing import Any

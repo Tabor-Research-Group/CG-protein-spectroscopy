@@ -1,15 +1,7 @@
 from __future__ import annotations
 
-"""Configuration system.
-
-The original `backmap_diffusion.zip` project used frozen dataclasses for config.
-This production version keeps that style, and adds:
-
-- YAML config loading (recommended for production runs)
-- Nested overrides from CLI for common hyperparameters
-- Additional knobs for plotting and visualization outputs
-
-All config values are intentionally simple Python scalars so they serialize cleanly.
+"""
+Configuration system
 """
 
 from dataclasses import asdict, dataclass

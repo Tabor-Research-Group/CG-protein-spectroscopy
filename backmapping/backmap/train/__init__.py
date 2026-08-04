@@ -1,7 +1,7 @@
 """Training utilities (losses, evaluation, plotting).
 
 The model architecture lives in :mod:`backmap.model`.
-This package contains everything around training:
+This module contains everything around training:
 - loss computation and metric extraction
 - evaluation loops (train/val/test)
 - per-epoch plotting
