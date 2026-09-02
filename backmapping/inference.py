@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 ================================================================================
-COMPLETE TRAJECTORY-BASED INFERENCE WITH RAMA & DIPOLE ANALYSIS
+TRAJECTORY-BASED INFERENCE WITH RAMA & DIPOLE ANALYSIS
 ================================================================================
 
 Usage:
@@ -1054,21 +1054,18 @@ def compute_dipole_vector(atoms: Dict[str, np.ndarray], osc_type: str, resname: 
         return None
     
     # Normalize CO vector 
-    CO_norm = np.linalg.norm(CO)
-    CO_unit = CO / CO_norm
+    CO /= np.linalg.norm(CO)
 
     # Compute s vector: s = 0.665*CO + 0.258*CN
     if CN is not None:
+        CN /= np.linalg.norm(CN)
         s = 0.665 * CO + 0.258 * CN
     else:
         # Fallback if N is missing: s = CO
         s = CO
 
-    # Compute Torii dipole using the formula
-    # μ = 0.276 * (s - ((CO·s) + √(|s|² - (CO·s)²)/tan(10°)) * CO)
-
     s_norm_sq = np.dot(s, s)
-    CO_dot_s = np.dot(CO_unit, s)
+    CO_dot_s = np.dot(CO, s)
 
     # tan(10°) ≈ 0.17633
     tan_10_deg = np.tan(np.deg2rad(10.0))
@@ -1082,10 +1079,11 @@ def compute_dipole_vector(atoms: Dict[str, np.ndarray], osc_type: str, resname: 
     # Compute the coefficient
     coeff = CO_dot_s + sqrt_term / tan_10_deg
 
-    # Compute dipole: μ = 0.276 * (s - coeff * CO_unit)
-    dipole = 0.276 * (s - coeff * CO_unit)
+    dipole = s - coeff * CO
+    dipole /= np.linalg.norm(dipole)
+    dipole *= 0.276
 
-    # Return dipole in Debye (already in correct units due to 0.276 prefactor)
+    # Return dipole in Debye
     return dipole.astype(np.float32)
 
 def add_dipole_vectors_to_oscillators(

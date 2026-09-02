@@ -8,6 +8,8 @@ import torch
 from backmap.geometry.dihedral import dihedral_angle, angle_to_sincos
 from backmap.geometry.spherical import cartesian_to_spherical_sincos
 
+itheta = 5.6712818196
+
 def _safe_norm(v: torch.Tensor, eps: float = 1e-8) -> torch.Tensor:
     return torch.sqrt(torch.clamp((v * v).sum(dim=-1), min=eps))
 
@@ -75,10 +77,8 @@ def _angle_sincos(p1: torch.Tensor, p2: torch.Tensor, p3: torch.Tensor, eps: flo
     """Return [cos(angle), sin(angle)] for angle p1-p2-p3."""
     v1 = p1 - p2
     v2 = p3 - p2
-    n1 = _safe_norm(v1, eps=eps)
-    n2 = _safe_norm(v2, eps=eps)
-    v1u = v1 / n1.unsqueeze(-1)
-    v2u = v2 / n2.unsqueeze(-1)
+    v1u = torch.nn.functional.normalize(v1, eps=eps, dim=-1)
+    v2u = torch.nn.functional.normalize(v2, eps=eps, dim=-1)
     cos = torch.clamp((v1u * v2u).sum(dim=-1), -1.0, 1.0)
     sin = torch.sqrt(torch.clamp(1.0 - cos * cos, min=0.0))
     return torch.stack([cos, sin], dim=-1)
@@ -172,31 +172,45 @@ def dipole_loss(
     """Dipole correlation restraint per peptide group.
 
     Dipole vector for peptide i is defined as:
-        d = 0.665 * CO + 0.258 * CN
+        d = 0.665 * CO/|CO|+ 0.258 * CN/|CN|
     where CO = O_i - C_i and CN = N_{i+1} - C_i.
 
     Unit dipole vectors are compared in the local frame of residue i BB
     """
     if dip_C.numel() == 0:
         return pred_global.new_tensor(0.0)
-
+    
     CO_p = pred_global[dip_O] - pred_global[dip_C]
     CN_p = pred_global[dip_Nn] - pred_global[dip_C]
+    CO_p = torch.nn.functional.normalize(CO_p, eps=eps, dim=-1)
+    CN_p = torch.nn.functional.normalize(CN_p, eps=eps, dim=-1)
     d_p = 0.665 * CO_p + 0.258 * CN_p
-
+    
+    dd_p = (d_p * d_p).sum(dim=-1)
+    COd_p = (CO_p * d_p).sum(dim=-1)
+    
+    mu_p = d_p - (COd_p + torch.sqrt(dd_p - COd_p*COd_p)*itheta) * CO_p
+    
     CO_t = true_global[dip_O] - true_global[dip_C]
     CN_t = true_global[dip_Nn] - true_global[dip_C]
+    CO_t = torch.nn.functional.normalize(CO_t, eps=eps, dim=-1)
+    CN_t = torch.nn.functional.normalize(CN_t, eps=eps, dim=-1)
     d_t = 0.665 * CO_t + 0.258 * CN_t
 
-    # transform vectors to the local frame of residue i: d_local = R^T d_global
+    dd_t = (d_t * d_t).sum(dim=-1)
+    COd_t = (CO_t * d_t).sum(dim=-1)
+    
+    mu_t = d_t - (COd_t + torch.sqrt(dd_t - COd_t*COd_t)*itheta) * CO_t
+
+    # transform dipole vectors to the local frame of residue i: d_local = R^T d_global
     R_i = bb_frames[dip_res_i]   # [K,3,3]
-    d_p_loc = torch.matmul(R_i.transpose(-1, -2), d_p.unsqueeze(-1)).squeeze(-1)
-    d_t_loc = torch.matmul(R_i.transpose(-1, -2), d_t.unsqueeze(-1)).squeeze(-1)
+    mu_p_loc = torch.matmul(R_i.transpose(-1, -2), mu_p.unsqueeze(-1)).squeeze(-1)
+    mu_t_loc = torch.matmul(R_i.transpose(-1, -2), mu_t.unsqueeze(-1)).squeeze(-1)
+    
+    mu_p_loc = torch.nn.functional.normalize(mu_p_loc, eps=eps, dim=-1)
+    mu_t_loc = torch.nn.functional.normalize(mu_t_loc, eps=eps, dim=-1)
 
-    u_p = d_p_loc / _safe_norm(d_p_loc, eps=eps).unsqueeze(-1)
-    u_t = d_t_loc / _safe_norm(d_t_loc, eps=eps).unsqueeze(-1)
-
-    corr = (u_p * u_t).sum(dim=-1)  # [K]
+    corr = (mu_p_loc * mu_t_loc).sum(dim=-1)  # [K]
     loss = 1.0 - corr
     return _clamp_loss(loss, max_loss_value).mean()
 

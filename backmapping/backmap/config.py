@@ -7,13 +7,9 @@ Configuration system
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Dict, Optional
-
 import json
 
-try:
-    import yaml
-except Exception:  # pragma: no cover
-    yaml = None
+import yaml
 
 
 # -----------------------------------------------------------------------------
@@ -86,7 +82,7 @@ class ModelConfig:
 class LossConfig:
     """Loss weights and stability settings.
 
-    The model predicts atom coordinates in the **local residue frame**.
+    The model predicts atom coordinates in the local residue frame.
 
     - Denoising is computed in local coordinates.
     - Bond/angle/dihedral/dipole/contact are computed in global coordinates.
@@ -155,7 +151,6 @@ class TrainConfig:
     grad_clip_norm: float = 1.0
 
     # Performance
-    num_workers: int = 0
     pin_memory: bool = False
     device: str = "cuda"  # "cuda" or "cpu"
 
@@ -213,8 +208,6 @@ class Config:
             json.dump(self.to_dict(), f, indent=2)
 
     def save_yaml(self, path: str | Path) -> None:
-        if yaml is None:
-            raise RuntimeError("PyYAML is not available; cannot save YAML")
         p = Path(path)
         p.parent.mkdir(parents=True, exist_ok=True)
         with p.open("w") as f:
@@ -297,8 +290,6 @@ class Config:
             raise FileNotFoundError(str(p))
 
         if p.suffix.lower() in {".yml", ".yaml"}:
-            if yaml is None:
-                raise RuntimeError("PyYAML is not available; cannot load YAML")
             with p.open("r") as f:
                 d = yaml.safe_load(f) or {}
             if not isinstance(d, dict):
@@ -313,15 +304,6 @@ class Config:
             return Config.from_dict(d)
 
         raise ValueError(f"Unknown config extension: {p.suffix}")
-
-    @staticmethod
-    def from_yaml(path: str | Path) -> "Config":
-        """Backwards-compatible alias.
-
-        Many earlier scripts used `Config.from_yaml(...)`. We keep the name
-        so existing command lines keep working.
-        """
-        return Config.load(path)
 
 def device_from_config(device_str: str) -> "torch.device":
     """Helper that resolves 'cuda' -> torch.device('cuda') only if available."""

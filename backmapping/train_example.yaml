@@ -25,6 +25,7 @@ diffusion:
   beta_schedule: cosine
   beta_start: 0.0001
   beta_end: 0.02
+  sample_init: uniform_ball
 
 model:
   hidden_dim: 256
@@ -35,6 +36,8 @@ model:
   rbf_num_centers: 16
   rbf_max_dist: 20.0
   max_atom_radius: 6.0
+  bead_edge_cutoff: 10.0
+  atom_edge_cutoff: 10.0
 
 loss:
   # denoising
@@ -64,7 +67,6 @@ train:
   grad_clip_norm: 1.0
 
   # performance
-  num_workers: 0
   pin_memory: false
   device: cuda
 
@@ -73,7 +75,6 @@ train:
   eval_every_epochs: 1
   test_every_epochs: 1
   save_every_epochs: 1
-  max_eval_batches: null
   amp: false
 
   seed: 123

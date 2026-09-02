@@ -11,7 +11,7 @@ Usage
 -----
   python scripts/train.py --config configs/train_example.yaml
 
-You can override common options:
+Can override common options:
   python scripts/train.py --config configs/train_example.yaml \
       --pickle path/to/amino_acid_baskets.pkl \
       --out runs/exp01 --device cuda --epochs 20 --batch_size 16
@@ -28,6 +28,7 @@ del _os, _sys, _REPO_ROOT
 
 import argparse
 from pathlib import Path
+import shutil
 from typing import Any, Dict, Optional, Tuple
 
 import torch
@@ -47,6 +48,7 @@ from backmap.model.pipeline import (
     build_node_geom_sph,
     build_node_pos,
 )
+from backmap.model.sampling import sample_atoms_full
 from backmap.train.losses import LossBreakdown, compute_losses
 from backmap.train.metrics import BatchMetrics, compute_batch_metrics
 from backmap.train.plotting import plot_epoch_metrics
@@ -315,7 +317,7 @@ def _evaluate(
         sum_contact += float(breakdown.contact.detach().cpu())
         n_good += 1
 
-        # MODIFIED: Collect metrics from ALL batches (or up to specified limit)
+        # Collect metrics from ALL batches (or up to specified limit)
         # Handle case where max_batches_for_metrics might be None
         should_collect_metrics = False
         if metrics is not None:
@@ -405,7 +407,7 @@ def _write_random_frame_overlays(
 ) -> None:
     """Write a few random frame overlays for VMD.
 
-    This uses *ground truth atoms/beads* from the pickle, and *predicted atoms*
+    This uses ground truth atoms/beads from the pickle, and predicted atoms
     from a single reverse-diffusion sampling run.
 
     We keep this very small per epoch (default 2 frames) to avoid slowing training.
@@ -431,8 +433,6 @@ def _write_random_frame_overlays(
     # Choose up to max_frames random frame keys
     perm = torch.randperm(len(keys), generator=rng).tolist()
     chosen = [keys[j] for j in perm[: max_frames]]
-
-    from backmap.model.sampling import sample_atoms_full
 
     for (folder, frame) in chosen:
         osc_indices = frame_to_indices[(folder, frame)]
@@ -513,7 +513,7 @@ def main() -> None:
     ap.add_argument("--resume", type=str, default=None, help="Resume from checkpoint")
     args = ap.parse_args()
 
-    cfg = Config.from_yaml(args.config) if args.config else Config()
+    cfg = Config.load(args.config) if args.config else Config()
 
     # Apply common overrides
     if args.pickle is not None:
@@ -537,14 +537,9 @@ def main() -> None:
 
     # Save config snapshot for reproducibility
     cfg.save_json(run_dir / "config.json")
+    # also keep the original YAML (if any)
     if args.config:
-        # also keep the original YAML (if any)
-        try:
-            import shutil
-
-            shutil.copy(args.config, run_dir / "config.yaml")
-        except Exception:
-            pass
+        shutil.copy(args.config, run_dir / "config.yaml")
 
     if not cfg.data.pickle_path:
         raise SystemExit("Config is missing data.pickle_path")
@@ -595,7 +590,6 @@ def main() -> None:
         train_set,
         batch_size=cfg.train.batch_size,
         shuffle=True,
-        num_workers=cfg.train.num_workers,
         pin_memory=cfg.train.pin_memory,
         collate_fn=collate_graph_samples,
     )
@@ -603,7 +597,6 @@ def main() -> None:
         val_set,
         batch_size=cfg.train.batch_size,
         shuffle=False,
-        num_workers=cfg.train.num_workers,
         pin_memory=cfg.train.pin_memory,
         collate_fn=collate_graph_samples,
     )
@@ -611,7 +604,6 @@ def main() -> None:
         test_set,
         batch_size=cfg.train.batch_size,
         shuffle=False,
-        num_workers=cfg.train.num_workers,
         pin_memory=cfg.train.pin_memory,
         collate_fn=collate_graph_samples,
     )

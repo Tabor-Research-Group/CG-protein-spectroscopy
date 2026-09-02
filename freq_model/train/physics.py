@@ -56,8 +56,10 @@ def calculate_torii_dipole_numpy(C: np.ndarray, O: np.ndarray, N: np.ndarray) ->
         discriminant = 0  # numerical safety
     sqrt_term = np.sqrt(discriminant)
 
-    # Full formula with AIM prefactor (0.276 instead of 2.73)
-    mu = 0.276 * (s - (CO_dot_s + sqrt_term / tan_10) * CO_unit)
+    # Full formula with AIM prefactor
+    mu = s - (CO_dot_s + sqrt_term / tan_10) * CO_unit
+    mu = mu / np.linalg.norm(mu)
+    mu = mu * 0.276
 
     return mu.astype(np.float32)
 
@@ -104,7 +106,9 @@ def calculate_torii_dipole_batch_numpy(C: np.ndarray, O: np.ndarray, N: np.ndarr
     sqrt_term = np.sqrt(discriminant)  # [N, 1]
 
     # Full formula with AIM prefactor
-    mu = 0.276 * (s - (CO_dot_s + sqrt_term / tan_10) * CO_unit)  # [N, 3]
+    mu = s - (CO_dot_s + sqrt_term / tan_10) * CO_unit  # [N, 3]
+    mu = mu / np.linalg.norm(mu, axis=1, keepdims=True)
+    mu = mu * 0.276
 
     return mu.astype(np.float32)
 
@@ -151,7 +155,9 @@ def calculate_torii_dipole_batch_torch(C: torch.Tensor, O: torch.Tensor, N: torc
     sqrt_term = torch.sqrt(discriminant)  # [N, 1]
 
     # Full formula with AIM prefactor
-    mu = 0.276 * (s - (CO_dot_s + sqrt_term / tan_10) * CO_unit)  # [N, 3]
+    mu =  - (CO_dot_s + sqrt_term / tan_10) * CO_unit  # [N, 3]
+    mu = mu / torch.norm(mu, dim=1, keepdim=True)
+    mu = mu * 0.276
 
     return mu
 
