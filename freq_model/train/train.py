@@ -245,6 +245,8 @@ def train_one_epoch(
         O_positions_pred = batch['O_positions_pred'].to(device)
         N_positions_pred = batch['N_positions_pred'].to(device)
         spectrum_true = batch['spectrum_true'].to(device)
+        dipoles_pred = batch['dipoles_pred'].to(device)
+        J_matrix_pred = batch['J_matrix_pred'].to(device)
         oscillator_mask = batch['oscillator_mask'].to(device)
 
         # Input feature sanity check
@@ -269,16 +271,6 @@ def train_one_epoch(
             print(f"    Indicates numerical instability - SKIPPING batch")
             skipped_batches += 1
             continue
-
-        # Calculate dipoles from predicted atom positions
-        dipoles_pred = calculate_torii_dipole_batch_torch(
-            C_positions_pred, O_positions_pred, N_positions_pred
-        )
-
-        # Calculate couplings (vectorized, no Python loops)
-        J_matrix_pred = calculate_tasumi_coupling_batch_torch(
-            dipoles_pred, C_positions_pred, oscillator_mask
-        )
 
         # Generate IR spectrum from H_diag, J_matrix, dipoles
         spectrum_pred = batch_generate_spectra_torch(
@@ -444,20 +436,12 @@ def evaluate(
         O_positions_pred = batch['O_positions_pred'].to(device)
         N_positions_pred = batch['N_positions_pred'].to(device)
         spectrum_true = batch['spectrum_true'].to(device)
+        dipoles_pred = batch['dipoles_pred'].to(device)
+        J_matrix_pred = batch['J_matrix_pred'].to(device)
         oscillator_mask = batch['oscillator_mask'].to(device)
 
         # Forward pass
         H_diag_pred = model(own_features, neighbor_features, neighbor_mask)
-
-        # Calculate dipoles
-        dipoles_pred = calculate_torii_dipole_batch_torch(
-            C_positions_pred, O_positions_pred, N_positions_pred
-        )
-
-        # Calculate couplings (vectorized)
-        J_matrix_pred = calculate_tasumi_coupling_batch_torch(
-            dipoles_pred, C_positions_pred, oscillator_mask
-        )
 
         # Generate spectra
         spectrum_pred = batch_generate_spectra_torch(

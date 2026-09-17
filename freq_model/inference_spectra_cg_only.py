@@ -1,33 +1,30 @@
 #!/usr/bin/env python3
 
+# Import from standard libraries
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import argparse
 import json
-import torch
-import numpy as np
-import matplotlib.pyplot as plt
 from pathlib import Path
 from typing import Dict, List
+
+# Import from 3rd party libraries
+import torch
+from torch.utils.data import DataLoader
+import numpy as np
+import matplotlib.pyplot as plt
 from tqdm import tqdm
 
-# Import from main codebase 
+# Import from main codebase
 from train.model import create_model
 from train.dataset import SpectrumDataset
 from train.data_utils import load_pkl_data, organize_by_frames, filter_frames_by_quality, extract_predicted_data
 from train.features import extract_features_for_frame
-from torch.utils.data import DataLoader
+from train.physics import batch_generate_spectra_torch, calculate_coupling_matrix
 
-# Import physics functions 
-from train.physics import (
-    calculate_torii_dipole_batch_torch,
-    batch_generate_spectra_torch,
-    calculate_tasumi_coupling_batch_torch
-)
-
-# Publication-quality plotting
+# Matplotlib settings
 plt.rcParams['font.family'] = 'DejaVu Sans'
 plt.rcParams['font.size'] = 12
 plt.rcParams['axes.labelsize'] = 14
@@ -57,6 +54,10 @@ class InferenceDataset(SpectrumDataset):
         
         # Extract predicted data (for model input)
         pred_data = extract_predicted_data(frame_oscillators)
+        dipoles_pred = pred_data['dipoles']
+        
+        # Calculate predicted coupling matrix
+        J_matrix_pred = calculate_coupling_matrix(pred_data, use_predicted=True)
         
         # Extract features
         features = extract_features_for_frame(pred_data, self.cutoff, self.max_neighbors)
@@ -69,6 +70,8 @@ class InferenceDataset(SpectrumDataset):
             'C_positions_pred': torch.from_numpy(pred_data['C_positions']).float(),
             'O_positions_pred': torch.from_numpy(pred_data['O_positions']).float(),
             'N_positions_pred': torch.from_numpy(pred_data['N_positions']).float(),
+            'dipoles_pred': torch.from_numpy(dipole_pred).float(),
+            'J_matrix_pred': torch.from_numpy(J_matrix_pred).float(),
             'frame_idx': frame_idx,
         }
 
@@ -102,7 +105,10 @@ def collate_fn_inference(batch: List[Dict]) -> Dict[str, torch.Tensor]:
     N_positions_pred = torch.zeros(B, max_N, 3)
     N_positions_pred[:, :, 1] = 1.3   # N offset in y
     N_positions_pred[:, :, 2] = 1000.0  # N at z=1000
-
+    
+    dipoles_pred = torch.zeros(B, max_N, 3)
+    J_matrix_pred = torch.zeros(B, max_N, max_N)
+    
     # Oscillator mask (for loss calculation)
     oscillator_mask = torch.zeros(B, max_N)
 
@@ -118,7 +124,9 @@ def collate_fn_inference(batch: List[Dict]) -> Dict[str, torch.Tensor]:
         C_positions_pred[i, :N] = sample['C_positions_pred']
         O_positions_pred[i, :N] = sample['O_positions_pred']
         N_positions_pred[i, :N] = sample['N_positions_pred']
-
+        dipoles_pred[i, :N] = sample['dipoles_pred']
+        J_matrix_pred[i, :N, :N] = sample['J_matrix_pred']
+        
         oscillator_mask[i, :N] = 1.0
 
         frame_indices.append(sample['frame_idx'])
@@ -130,6 +138,8 @@ def collate_fn_inference(batch: List[Dict]) -> Dict[str, torch.Tensor]:
         'C_positions_pred': C_positions_pred,
         'O_positions_pred': O_positions_pred,
         'N_positions_pred': N_positions_pred,
+        'dipoles_pred': dipole_pred,
+        'J_matrix_pred': J_matrix_pred,
         'oscillator_mask': oscillator_mask,
         'frame_indices': frame_indices,
     }
@@ -166,21 +176,13 @@ def inference_on_dataloader(
             C_positions_pred = batch['C_positions_pred'].to(device)
             O_positions_pred = batch['O_positions_pred'].to(device)
             N_positions_pred = batch['N_positions_pred'].to(device)
+            dipoles_pred = batch['dipoles_pred'].to(device)
+            J_matrix_pred = batch['J_matrix_pred'].to(device)
             oscillator_mask = batch['oscillator_mask'].to(device)
             frame_indices = batch['frame_indices']
 
             # Forward pass: predict H_diag
             H_diag_pred = model(own_features, neighbor_features, neighbor_mask)
-
-            # Calculate dipoles
-            dipoles_pred = calculate_torii_dipole_batch_torch(
-                C_positions_pred, O_positions_pred, N_positions_pred
-            )
-
-            # Calculate couplings for predicted
-            J_matrix_pred = calculate_tasumi_coupling_batch_torch(
-                dipoles_pred, C_positions_pred, oscillator_mask
-            )
 
             # Generate IR spectrum
             spectrum_pred = batch_generate_spectra_torch(

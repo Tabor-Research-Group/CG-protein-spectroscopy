@@ -8,11 +8,7 @@ import numpy as np
 from typing import Dict, List, Tuple
 from .data_utils import organize_by_frames, extract_ground_truth_data, extract_predicted_data
 from .features import extract_features_for_frame
-from .physics import (
-    calculate_torii_dipole_batch_numpy,
-    calculate_tasumi_coupling_numpy,
-    generate_spectrum_numpy
-)
+from .physics import calculate_coupling_matrix, generate_spectrum_numpy
 
 
 class SpectrumDataset(Dataset):
@@ -83,16 +79,12 @@ class SpectrumDataset(Dataset):
         gt_data = extract_ground_truth_data(frame_oscillators)
 
         # Calculate ground truth dipoles (from atomistic atoms)
-        dipoles_true = calculate_torii_dipole_batch_numpy(
-            gt_data['C_positions'],
-            gt_data['O_positions'],
-            gt_data['N_positions']
-        )
+        dipoles_true = gt_data['dipoles']
 
         # Calculate ground truth coupling matrix
-        J_matrix_true = calculate_tasumi_coupling_numpy(dipoles_true, gt_data['C_positions'])
+        J_matrix_true = calculate_coupling_matrix(gt_data)
 
-        # Generate ground truth spectrum
+        # Generate ground truth inhomogeneous limit spectrum
         _, spectrum_true = generate_spectrum_numpy(
             gt_data['H_diag'],
             J_matrix_true,
@@ -102,7 +94,11 @@ class SpectrumDataset(Dataset):
 
         # Extract predicted data (for model input)
         pred_data = extract_predicted_data(frame_oscillators)
-
+        dipoles_pred = pred_data['dipoles']
+        
+        # Calculate predicted coupling matrix
+        J_matrix_pred = calculate_coupling_matrix(pred_data, use_predicted=True)
+        
         # Extract features
         features = extract_features_for_frame(pred_data, self.cutoff, self.max_neighbors)
 
@@ -118,6 +114,8 @@ class SpectrumDataset(Dataset):
             'spectrum_true': torch.from_numpy(spectrum_true).float(),
             'dipoles_true': torch.from_numpy(dipoles_true).float(),
             'J_matrix_true': torch.from_numpy(J_matrix_true).float(),
+            'dipoles_pred': torch.from_numpy(dipole_pred).float(),
+            'J_matrix_pred': torch.from_numpy(J_matrix_pred).float(),
             'frame_idx': frame_idx,
         }
 
@@ -161,7 +159,9 @@ def collate_fn_pad(batch: List[Dict]) -> Dict[str, torch.Tensor]:
 
     spectrum_true = torch.zeros(B, M)
     dipoles_true = torch.zeros(B, max_N, 3)
+    dipoles_pred = torch.zeros(B, max_N, 3)
     J_matrix_true = torch.zeros(B, max_N, max_N)
+    J_matrix_pred = torch.zeros(B, max_N, max_N)
 
     # Oscillator mask (for loss calculation)
     oscillator_mask = torch.zeros(B, max_N)
@@ -181,7 +181,9 @@ def collate_fn_pad(batch: List[Dict]) -> Dict[str, torch.Tensor]:
         N_positions_pred[i, :N] = sample['N_positions_pred']
         spectrum_true[i] = sample['spectrum_true']
         dipoles_true[i, :N] = sample['dipoles_true']
+        dipoles_pred[i, :N] = sample['dipoles_pred']
         J_matrix_true[i, :N, :N] = sample['J_matrix_true']
+        J_matrix_pred[i, :N, :N] = sample['J_matrix_pred']
 
         oscillator_mask[i, :N] = 1.0
 
@@ -197,7 +199,9 @@ def collate_fn_pad(batch: List[Dict]) -> Dict[str, torch.Tensor]:
         'N_positions_pred': N_positions_pred,
         'spectrum_true': spectrum_true,
         'dipoles_true': dipoles_true,
+        'dipoles_pred': dipole_pred,
         'J_matrix_true': J_matrix_true,
+        'J_matrix_pred': J_matrix_pred,
         'oscillator_mask': oscillator_mask,
         'frame_indices': frame_indices,
     }

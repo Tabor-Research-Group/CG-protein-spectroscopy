@@ -1,11 +1,10 @@
 """
 ================================================================================
-FIXED: CG + ATOMISTIC DATA EXTRACTION PIPELINE
+CG + ATOMISTIC DATA EXTRACTION PIPELINE
 ================================================================================
 """
 
 import os
-import sys
 import numpy as np
 import pickle
 import argparse
@@ -15,12 +14,7 @@ from functools import partial
 from tqdm import tqdm
 import MDAnalysis as mda
 from MDAnalysis.analysis.dihedrals import Ramachandran
-
-try:
-    import yaml
-except ImportError:
-    print("Error: PyYAML not installed. Install with: pip install pyyaml")
-    sys.exit(1)
+import yaml
 
 warnings.filterwarnings("ignore")
 
@@ -58,13 +52,13 @@ class Config:
         if config_path is not None and os.path.exists(config_path):
             with open(config_path, 'r') as f:
                 self.config = yaml.safe_load(f)
-            print(f"✓ Loaded configuration from: {config_path}")
+            print(f"Loaded configuration from: {config_path}")
         else:
             self.config = self._get_default_config()
             if config_path is not None:
-                print(f"⚠ Config file '{config_path}' not found, using defaults")
+                print(f"Config file '{config_path}' not found, using defaults")
             else:
-                print("✓ Using default configuration")
+                print("Using default configuration")
     
     def _get_default_config(self):
         return {
@@ -122,7 +116,7 @@ def select_frames(total_frames, n_frames, method='random', stride=10, random_see
 
 
 # ============================================================================
-# CG PDB PARSING - FIXED TO TRACK BEAD SEQUENCES
+# CG PDB PARSING
 # ============================================================================
 
 def parse_cg_frame_structure(frame_content):
@@ -178,12 +172,6 @@ def parse_cg_frame_structure(frame_content):
 def extract_oscillator_list_from_cg(frame_content):
     """
     Extract oscillator list with proper BB/SC bead associations.
-    
-    Key changes:
-    1. BB oscillators start from FIRST residue (not second)
-    2. Each BB oscillator gets BOTH BB_curr and BB_next beads
-    3. SC beads between consecutive BB beads are collected
-    4. SC oscillators get their SC1 bead + subsequent SC beads + previous BB
     
     Returns:
         oscillators: List of oscillator definitions with bead info
@@ -337,33 +325,33 @@ def calculate_ramachandran_angles(universe):
         protein = universe.select_atoms('protein')
         
         if len(protein) == 0:
-            print(f"    ⚠ ERROR: No protein atoms found!")
+            print(f"    ERROR: No protein atoms found!")
             return None, []
         
         residue_list = [(res.resid, res.resname) for res in protein.residues]
         n_residues_total = len(residue_list)
         
-        print(f"    → Found {n_residues_total} protein residues")
-        print(f"    → Running Ramachandran analysis...")
+        print(f"    Found {n_residues_total} protein residues")
+        print(f"    Running Ramachandran analysis...")
         rama = Ramachandran(protein).run()
         
         if not hasattr(rama, 'results') or not hasattr(rama.results, 'angles'):
-            print(f"    ⚠ ERROR: Ramachandran calculation failed!")
+            print(f"    ERROR: Ramachandran calculation failed!")
             return None, residue_list
         
         rama_angles = rama.results.angles
         
         if rama_angles is None or rama_angles.size == 0:
-            print(f"    ⚠ ERROR: Ramachandran returned empty array!")
+            print(f"    ERROR: Ramachandran returned empty array!")
             return None, residue_list
         
         n_frames, n_rama_residues, n_angles = rama_angles.shape
-        print(f"    → Ramachandran shape: ({n_frames} frames, {n_rama_residues} residues)")
+        print(f"    Ramachandran shape: ({n_frames} frames, {n_rama_residues} residues)")
         
         return rama_angles, residue_list
         
     except Exception as e:
-        print(f"    ⚠ ERROR calculating Ramachandran: {str(e)}")
+        print(f"    ERROR calculating Ramachandran: {str(e)}")
         import traceback
         traceback.print_exc()
         return None, []
@@ -413,27 +401,13 @@ def get_nnfs_angles_from_array(rama_angles, residue_list, frame_idx, resid):
 
 
 # ============================================================================
-# OSCILLATOR EXTRACTION - FIXED
+# OSCILLATOR EXTRACTION
 # ============================================================================
 
 def extract_backbone_oscillator(oscillator, atomistic_dict,
                                 rama_angles, residue_list, frame_idx):
     """
-    Extract backbone C=O oscillator with FIXED atom and bead extraction.
-    
-    Changes:
-    1. Now extracts CA_prev and N_prev from previous residue
-    2. Stores BOTH BB_curr and BB_next bead positions
-    3. Includes all SC beads between the two BB beads
-    4. ✓ VALIDATES that CG and atomistic residue keys match
-    
-    The backbone oscillator between residue i and i+1 now has:
-    - Atoms from residue i: C, O, CA, N (if exists)
-    - Atoms from residue i+1: N, H, CA
-    - BB beads: BB_curr (residue i) and BB_next (residue i+1)
-    - SC beads: All SC1...SCn between these BB beads
-    
-    CRITICAL: residue_key must match bb_curr_key (the CA_prev residue)
+    Extract backbone C=O oscillator with atom and bead extraction.
     """
     residue_key = oscillator['residue_key']
     resid, resname = residue_key
@@ -444,7 +418,7 @@ def extract_backbone_oscillator(oscillator, atomistic_dict,
     
     # ✓ VALIDATION: Verify residue_key matches bb_curr_key
     if residue_key != bb_curr_key:
-        print(f"    ⚠ WARNING: Residue key mismatch! "
+        print(f"    WARNING: Residue key mismatch! "
               f"residue_key={residue_key} != bb_curr_key={bb_curr_key}")
         return None
     
@@ -453,10 +427,10 @@ def extract_backbone_oscillator(oscillator, atomistic_dict,
     atoms_next = atomistic_dict.get(bb_next_key)
     
     if atoms_curr is None:
-        print(f"    ⚠ WARNING: No atomistic data for bb_curr residue {bb_curr_key}")
+        print(f"    WARNING: No atomistic data for bb_curr residue {bb_curr_key}")
         return None
     if atoms_next is None:
-        print(f"    ⚠ WARNING: No atomistic data for bb_next residue {bb_next_key}")
+        print(f"    WARNING: No atomistic data for bb_next residue {bb_next_key}")
         return None
     
     # Check required atoms
@@ -489,24 +463,15 @@ def extract_backbone_oscillator(oscillator, atomistic_dict,
     
     return {
         'oscillator_type': 'backbone',
-        'residue_key': residue_key,  # ✓ This matches bb_curr_key = CA_prev residue
+        'residue_key': residue_key,
         'residue_name': resname,
-        
-        # ✓ FIXED: Now includes CA_prev and N_prev
         'atoms': atom_dict,
-        
-        # NNFS angles
-        'rama_nnfs': nnfs_angles,
-        
-        # ✓ NEW: Store BOTH BB beads explicitly
+        'rama_nnfs': nnfs_angles, # NNFS angles
         'bb_curr': oscillator['bb_curr_pos'],
         'bb_next': oscillator['bb_next_pos'],
-        'bb_curr_key': bb_curr_key,  # ✓ Should equal residue_key
+        'bb_curr_key': bb_curr_key,
         'bb_next_key': bb_next_key,
-        
-        # ✓ NEW: All SC beads between the two BB beads
         'sc_beads': oscillator['sc_beads'],
-        
         # Legacy fields for compatibility
         'cg_bead': oscillator['bb_curr_pos'],  # Primary bead
         'cg_bead_type': 'BB'
@@ -516,16 +481,7 @@ def extract_backbone_oscillator(oscillator, atomistic_dict,
 def extract_sidechain_oscillator(oscillator, atomistic_dict,
                                  rama_angles, residue_list, frame_idx):
     """
-    Extract sidechain oscillator with FIXED bead collection.
-    
-    Changes:
-    1. Now includes previous BB bead
-    2. Collects ALL SC beads (SC1, SC2, SC3, ...) for this oscillator
-    3. ✓ VALIDATES that CG and atomistic residue keys match
-    
-    Sidechain oscillators have NO NNFS neighbor interactions.
-    
-    CRITICAL: residue_key must match the atomistic residue we extract from
+    Extract sidechain oscillator with bead collection.
     """
     residue_key = oscillator['residue_key']
     resid, resname = residue_key
@@ -536,7 +492,7 @@ def extract_sidechain_oscillator(oscillator, atomistic_dict,
     # ✓ Get atomistic data and verify it exists
     atoms = atomistic_dict.get(residue_key)
     if atoms is None:
-        print(f"    ⚠ WARNING: No atomistic data for sidechain residue {residue_key}")
+        print(f"    WARNING: No atomistic data for sidechain residue {residue_key}")
         return None
     
     # Get sidechain atom mapping
@@ -561,7 +517,7 @@ def extract_sidechain_oscillator(oscillator, atomistic_dict,
     if resname == 'GLN':
         # GLN: CA-CB-CG-CD(=OE1)-NE2(-HE21/HE22)
         sidechain_atoms.update({
-            'CG': atoms.get('CG', np.zeros(3, dtype=np.float32)),  # ✓ Explicitly include CG
+            'CG': atoms.get('CG', np.zeros(3, dtype=np.float32)),
             'CD': atoms[sc_map['carbonyl_C']],
             'OE1': atoms[sc_map['carbonyl_O']],
             'NE2': atoms[sc_map['amide_N']],
@@ -572,7 +528,7 @@ def extract_sidechain_oscillator(oscillator, atomistic_dict,
         # ASN: CA-CB-CG(=OD1)-ND2(-HD21/HD22)
         # Note: CG is the carbonyl carbon for ASN
         sidechain_atoms.update({
-            'CG': atoms[sc_map['carbonyl_C']],  # ✓ CG is carbonyl C for ASN
+            'CG': atoms[sc_map['carbonyl_C']],
             'OD1': atoms[sc_map['carbonyl_O']],
             'ND2': atoms[sc_map['amide_N']],
             'HD21': atoms.get(sc_map['amide_H1'], np.zeros(3, dtype=np.float32)),
@@ -589,19 +545,13 @@ def extract_sidechain_oscillator(oscillator, atomistic_dict,
     
     return {
         'oscillator_type': 'sidechain',
-        'residue_key': residue_key,  # ✓ Matches the atomistic residue
+        'residue_key': residue_key,
         'residue_name': resname + '-SC',
-        
         'atoms': sidechain_atoms,
         'rama_nnfs': nnfs_angles,
-        
-        # ✓ NEW: Previous BB bead
         'bb_prev': oscillator['bb_prev_pos'],
         'bb_prev_key': oscillator['bb_prev_key'],
-        
-        # ✓ NEW: All SC beads (SC1, SC2, SC3, ...)
         'sc_beads': oscillator['sc_beads'],
-        
         # Legacy fields
         'cg_bead': oscillator['sc_beads'].get('SC1'),
         'cg_bead_type': 'SC1'
@@ -635,7 +585,7 @@ def validate_oscillator_consistency(oscillator_data, verbose=False):
     """
     Validate individual oscillator data for consistency.
     
-    COMPREHENSIVE checks:
+    Checks:
     1. Residue key consistency (CG vs atomistic)
     2. Bead existence and proper assignment
     3. Atom extraction completeness (all required atoms present and non-null)
@@ -889,11 +839,11 @@ def validate_oscillator_consistency(oscillator_data, verbose=False):
         if errors:
             print(f"    ERRORS ({len(errors)}):")
             for err in errors:
-                print(f"      ✗ {err}")
+                print(f"      {err}")
         if warnings:
             print(f"    WARNINGS ({len(warnings)}):")
             for warn in warnings:
-                print(f"      ⚠ {warn}")
+                print(f"      {warn}")
     
     return len(errors) == 0, errors, warnings
 
@@ -916,7 +866,7 @@ def validate_frame_data(frame_oscillators, hamiltonians, frame_idx,
         if strict:
             return False, msg
         else:
-            print(f"    ⚠ {msg}")
+            print(f"    {msg}")
             return True, None
     
     if expected_count is not None and n_osc != expected_count:
@@ -924,7 +874,7 @@ def validate_frame_data(frame_oscillators, hamiltonians, frame_idx,
         if strict:
             return False, msg
         else:
-            print(f"    ⚠ {msg}")
+            print(f"    {msg}")
     
     return True, None
 
@@ -979,21 +929,21 @@ def process_folder(folder_path, config, n_frames=None):
         selected_frames = select_frames(total_frames, n_frames, method=selection_method,
                                        stride=stride, random_seed=random_seed)
         
-        print(f"  → Frames to process: {len(selected_frames)}")
+        print(f"  Frames to process: {len(selected_frames)}")
         
         # Calculate Ramachandran angles
-        print(f"  → Calculating Ramachandran angles...")
+        print(f"  Calculating Ramachandran angles...")
         rama_angles, residue_list = calculate_ramachandran_angles(u)
         
         if rama_angles is None:
-            print(f"  ⚠ WARNING: No Ramachandran angles calculated!")
+            print(f"  WARNING: No Ramachandran angles calculated!")
         else:
-            print(f"  ✓ Calculated angles for {len(rama_angles)} frames")
+            print(f"  Calculated angles for {len(rama_angles)} frames")
         
         # Get expected oscillator count
         oscillators_template, _ = extract_oscillator_list_from_cg(cg_frames_all[0])
         expected_osc_count = len(oscillators_template)
-        print(f"  → Expected oscillators per frame: {expected_osc_count}")
+        print(f"  Expected oscillators per frame: {expected_osc_count}")
         
         # Process all frames
         paired_data = []
@@ -1031,7 +981,7 @@ def process_folder(folder_path, config, n_frames=None):
                     
                     frame_oscillators.append(osc_data)
             
-            # ✅ COMPREHENSIVE VALIDATION
+            # COMPREHENSIVE VALIDATION
             n_extracted = len(frame_oscillators)
             n_expected = len(oscillators_list)
             
@@ -1043,7 +993,7 @@ def process_folder(folder_path, config, n_frames=None):
                 if strict:
                     raise ValueError(msg)
                 else:
-                    print(f"    ⚠ {msg}")
+                    print(f"    {msg}")
             
             # Check 2: Do Hamiltonian counts match?
             if hamiltonians is not None:
@@ -1054,7 +1004,7 @@ def process_folder(folder_path, config, n_frames=None):
                     if strict:
                         raise ValueError(msg)
                     else:
-                        print(f"    ⚠ {msg}")
+                        print(f"    {msg}")
             
             # Check 3: Verify residue key consistency between CG and atomistic
             for osc_idx, (cg_osc, extracted_osc) in enumerate(zip(oscillators_list, frame_oscillators)):
@@ -1067,7 +1017,7 @@ def process_folder(folder_path, config, n_frames=None):
                     if strict:
                         raise ValueError(msg)
                     else:
-                        print(f"    ⚠ {msg}")
+                        print(f"    {msg}")
                 
                 # For backbone oscillators, verify bb_curr_key matches residue_key
                 if extracted_osc['oscillator_type'] == 'backbone':
@@ -1078,7 +1028,7 @@ def process_folder(folder_path, config, n_frames=None):
                         if strict:
                             raise ValueError(msg)
                         else:
-                            print(f"    ⚠ {msg}")
+                            print(f"    {msg}")
             
             # Check 4: Are any Hamiltonians None when they shouldn't be?
             if hamiltonians is not None:
@@ -1090,12 +1040,12 @@ def process_folder(folder_path, config, n_frames=None):
                     if strict:
                         raise ValueError(msg)
                     else:
-                        print(f"    ⚠ {msg}")
+                        print(f"    {msg}")
             
             paired_data.append(frame_oscillators)
         
         total_oscillators = sum(len(osc) for osc in paired_data)
-        print(f"  → Extracted {total_oscillators} oscillators from {len(paired_data)} frames")
+        print(f"  Extracted {total_oscillators} oscillators from {len(paired_data)} frames")
         
         return paired_data
         
@@ -1166,7 +1116,7 @@ def collect_and_organize_data(base_dir, config):
         
         valid_folders.append(folder)
     
-    print(f"✓ Found {len(valid_folders)} valid protein folders")
+    print(f"Found {len(valid_folders)} valid protein folders")
     
     if any(missing_stats.values()):
         print(f"\nSkipped folders due to missing files:")
@@ -1204,9 +1154,9 @@ def collect_and_organize_data(base_dir, config):
             completed += 1
             if result is not None:
                 all_paired_data[folder] = result
-                print(f"  [{completed}/{len(valid_folders)}] ✓ {folder}")
+                print(f"  [{completed}/{len(valid_folders)}]  {folder}")
             else:
-                print(f"  [{completed}/{len(valid_folders)}] ✗ {folder}")
+                print(f"  [{completed}/{len(valid_folders)}]  {folder}")
         
         pool.close()
         pool.join()
@@ -1239,7 +1189,7 @@ def analyze_statistics(amino_acid_baskets):
     """
     Print detailed statistics including validation checks.
     
-    Now includes COMPREHENSIVE verification:
+    Includes verification:
     1. All oscillators have consistent CG/atomistic mapping
     2. Hamiltonian availability
     3. Ramachandran angle availability
@@ -1319,7 +1269,7 @@ def analyze_statistics(amino_acid_baskets):
     
     # Print any amino acids with errors
     if total_errors > 0:
-        print(f"\n⚠ AMINO ACIDS WITH ERRORS:")
+        print(f"\nAMINO ACIDS WITH ERRORS:")
         for aa, details in validation_details.items():
             if details['errors'] > 0:
                 print(f"  {aa}: {details['errors']} errors across {details['total']} oscillators "
@@ -1401,7 +1351,7 @@ def generate_validation_report(amino_acid_baskets, output_file='validation_repor
     report_lines.append("")
     
     if total_errors == 0 and total_warnings == 0:
-        report_lines.append("✓✓✓ PERFECT EXTRACTION - NO ERRORS OR WARNINGS ✓✓✓")
+        report_lines.append("PERFECT EXTRACTION - NO ERRORS OR WARNINGS")
         report_lines.append("")
     
     # Per-amino-acid breakdown
@@ -1419,11 +1369,11 @@ def generate_validation_report(amino_acid_baskets, output_file='validation_repor
         report_lines.append(f"  Warnings: {stats['warnings']}")
         
         if stats['errors'] > 0:
-            report_lines.append(f"  ⚠ HAS ERRORS - see detailed section below")
+            report_lines.append(f"  HAS ERRORS - see detailed section below")
         elif stats['warnings'] > 0:
-            report_lines.append(f"  ⚠ Has warnings (non-critical)")
+            report_lines.append(f"  Has warnings (non-critical)")
         else:
-            report_lines.append(f"  ✓ Perfect")
+            report_lines.append(f"  Perfect")
         
         report_lines.append("")
     
@@ -1449,7 +1399,7 @@ def generate_validation_report(amino_acid_baskets, output_file='validation_repor
             report_lines.append(f"  {i}. [{len(occurrences)}x] {error_msg}")
             if len(occurrences) <= 3:
                 for aa, osc_idx in occurrences:
-                    report_lines.append(f"       → {aa} oscillator {osc_idx}")
+                    report_lines.append(f"       {aa} oscillator {osc_idx}")
         report_lines.append("")
     
     # Detailed failure cases
@@ -1495,15 +1445,15 @@ def generate_validation_report(amino_acid_baskets, output_file='validation_repor
     report_lines.append("="*80)
     
     if total_errors == 0 and total_warnings == 0:
-        report_lines.append("✓✓✓ DATA EXTRACTION IS PERFECT ✓✓✓")
+        report_lines.append("DATA EXTRACTION IS PERFECT")
         report_lines.append("All oscillators passed comprehensive validation.")
         report_lines.append("Ready for downstream analysis.")
     elif total_errors == 0:
-        report_lines.append("✓ DATA EXTRACTION IS VALID")
+        report_lines.append("DATA EXTRACTION IS VALID")
         report_lines.append(f"No critical errors. {total_warnings} warnings (non-critical issues).")
         report_lines.append("Safe to proceed with caution.")
     else:
-        report_lines.append("✗ DATA EXTRACTION HAS ERRORS")
+        report_lines.append("DATA EXTRACTION HAS ERRORS")
         report_lines.append(f"{total_errors} critical errors found across {total_oscillators} oscillators.")
         report_lines.append("Review error details above and fix extraction logic.")
     
@@ -1514,7 +1464,7 @@ def generate_validation_report(amino_acid_baskets, output_file='validation_repor
     with open(output_file, 'w') as f:
         f.write(report_text)
     
-    print(f"\n✓ Validation report saved to: {output_file}")
+    print(f"\nValidation report saved to: {output_file}")
     
     # Also print to console
     print(report_text)
@@ -1567,9 +1517,9 @@ def generate_validation_report(amino_acid_baskets, output_file='validation_repor
             
             # Check consistency
             if osc.get('bb_curr_key') == osc.get('residue_key'):
-                print(f"    ✓ Residue key matches bb_curr_key")
+                print(f"    Residue key matches bb_curr_key")
             else:
-                print(f"    ✗ MISMATCH: residue_key != bb_curr_key")
+                print(f"    MISMATCH: residue_key != bb_curr_key")
             
             sc_beads = osc.get('sc_beads', {})
             print(f"    SC beads between BB_curr and BB_next: {list(sc_beads.keys()) if sc_beads else 'none'}")
@@ -1583,7 +1533,7 @@ def generate_validation_report(amino_acid_baskets, output_file='validation_repor
                 if atom_name in atoms:
                     atom_pos = atoms[atom_name]
                     is_zero = np.allclose(atom_pos, 0.0) if isinstance(atom_pos, np.ndarray) else False
-                    status = "⚠ at origin" if is_zero else "✓"
+                    status = "warning at origin" if is_zero else "✓"
                     print(f"      {atom_name:8s}: {atom_pos}  {status}")
                 else:
                     print(f"      {atom_name:8s}: MISSING ✗")
@@ -1594,10 +1544,10 @@ def generate_validation_report(amino_acid_baskets, output_file='validation_repor
                 if atom_name in atoms:
                     atom_pos = atoms[atom_name]
                     is_zero = np.allclose(atom_pos, 0.0) if isinstance(atom_pos, np.ndarray) else False
-                    status = "⚠ at origin" if is_zero else "✓"
+                    status = "warning at origin" if is_zero else "✓"
                     print(f"      {atom_name:8s}: {atom_pos}  {status}")
                 else:
-                    print(f"      {atom_name:8s}: MISSING ✗")
+                    print(f"      {atom_name:8s}: MISSING")
         
         # ========================================================================
         # SIDECHAIN OSCILLATOR DETAILS
@@ -1614,9 +1564,9 @@ def generate_validation_report(amino_acid_baskets, output_file='validation_repor
             print(f"    SC beads:     {list(sc_beads.keys()) if sc_beads else 'MISSING'}")
             
             if 'SC1' in sc_beads:
-                print(f"    SC1 pos:      {sc_beads['SC1']}  ✓")
+                print(f"    SC1 pos:      {sc_beads['SC1']}")
             else:
-                print(f"    SC1 pos:      MISSING ✗")
+                print(f"    SC1 pos:      MISSING")
             
             print(f"\n  ATOMISTIC COORDINATES:")
             atoms = osc.get('atoms', {})
@@ -1636,14 +1586,14 @@ def generate_validation_report(amino_acid_baskets, output_file='validation_repor
                     atom_pos = atoms[atom_name]
                     is_zero = np.allclose(atom_pos, 0.0) if isinstance(atom_pos, np.ndarray) else False
                     is_optional = atom_name.startswith('H')  # Hydrogens are optional
-                    status = "✓"
+                    status = "Valid"
                     if is_zero and not is_optional:
-                        status = "⚠ at origin"
+                        status = "warning at origin"
                     elif is_zero and is_optional:
                         status = "(optional, zero)"
                     print(f"      {atom_name:8s}: {atom_pos}  {status}")
                 else:
-                    print(f"      {atom_name:8s}: MISSING ✗")
+                    print(f"      {atom_name:8s}: MISSING")
         
         # ========================================================================
         # RAMACHANDRAN ANGLES
@@ -1658,9 +1608,9 @@ def generate_validation_report(amino_acid_baskets, output_file='validation_repor
         if osc.get('oscillator_type') == 'sidechain':
             all_none = all(rama.get(k) is None for k in ['phi_N', 'psi_N', 'phi_C', 'psi_C'])
             if all_none:
-                print(f"    ✓ All angles are None (correct for sidechains)")
+                print(f"    All angles are None (correct for sidechains)")
             else:
-                print(f"    ✗ ERROR: Sidechain should have all angles = None")
+                print(f"    ERROR: Sidechain should have all angles = None")
         
         # ========================================================================
         # COMPREHENSIVE VALIDATION
@@ -1669,9 +1619,9 @@ def generate_validation_report(amino_acid_baskets, output_file='validation_repor
         is_valid, errors, warnings = validate_oscillator_consistency(osc, verbose=False)
         
         if is_valid:
-            print(f"    ✓ PASSED all validation checks")
+            print(f"    PASSED all validation checks")
         else:
-            print(f"    ✗ FAILED validation")
+            print(f"    FAILED validation")
         
         if errors:
             print(f"    Errors ({len(errors)}):")
@@ -1684,7 +1634,7 @@ def generate_validation_report(amino_acid_baskets, output_file='validation_repor
                 print(f"      - {warn}")
         
         if is_valid and not warnings:
-            print(f"    ✓✓ PERFECT - No errors or warnings")
+            print(f"    PERFECT - No errors or warnings")
     
     print(f"\n{'='*80}\n")
 
@@ -1730,7 +1680,7 @@ def main():
     print("="*80)
     
     if os.path.exists(output_file) and not args.overwrite:
-        print(f"\n✓ Loading existing: {output_file}")
+        print(f"\nLoading existing: {output_file}")
         with open(output_file, 'rb') as f:
             amino_acid_baskets = pickle.load(f)
     else:
@@ -1761,15 +1711,15 @@ def main():
     print(f"Total oscillators: {sum(len(d) for d in amino_acid_baskets.values())}")
     print(f"{'='*80}")
     print("\nKEY FEATURES IMPLEMENTED:")
-    print("  ✓ Backbone: 7 atoms (C,O,CA,N from prev + N,H,CA from curr)")
-    print("  ✓ Backbone: Both bb_curr and bb_next beads stored")
-    print("  ✓ Backbone: All SC beads between BB beads collected")
-    print("  ✓ Sidechain: All SC1...SCn beads + previous BB")
-    print("  ✓ Sidechain (GLN): CA, CB, CG, CD, OE1, NE2, HE21, HE22")
-    print("  ✓ Sidechain (ASN): CA, CB, CG, OD1, ND2, HD21, HD22")
-    print("  ✓ COMPREHENSIVE validation with detailed error reporting")
-    print("  ✓ Full CG-atomistic consistency checks")
-    print("  ✓ Oscillator count matching: CG == atomistic == Hamiltonian")
+    print("  Backbone: 7 atoms (C,O,CA,N from prev + N,H,CA from curr)")
+    print("  Backbone: Both bb_curr and bb_next beads stored")
+    print("  Backbone: All SC beads between BB beads collected")
+    print("  Sidechain: All SC1...SCn beads + previous BB")
+    print("  Sidechain (GLN): CA, CB, CG, CD, OE1, NE2, HE21, HE22")
+    print("  Sidechain (ASN): CA, CB, CG, OD1, ND2, HD21, HD22")
+    print("  COMPREHENSIVE validation with detailed error reporting")
+    print("  Full CG-atomistic consistency checks")
+    print("  Oscillator count matching: CG == atomistic == Hamiltonian")
     print(f"{'='*80}\n")
     print("USAGE:")
     print("  Debug specific amino acid:  --debug-sample ALA")

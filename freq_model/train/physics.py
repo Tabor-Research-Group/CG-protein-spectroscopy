@@ -2,14 +2,27 @@
 Physics calculations for amide I spectroscopy.
 """
 
+import warnings
+
 import numpy as np
 import torch
-from typing import Tuple
+from typing import Tuple, Dict
 
 # tan(10°)
 tan_10 = np.tan(np.radians(10.0))
 
-def calculate_torii_dipole_numpy(C: np.ndarray, O: np.ndarray, N: np.ndarray) -> np.ndarray:
+
+NNC_map = {}
+with open('nnc_map.dat') as f:
+    for map_num in range(5):
+        mapname = f.readline().strip()
+        mapdata = []
+        for _ in range(13):
+            mapdata.append(f.readline().strip())
+        mapdata = np.loadtxt(mapdata)
+        NNC_map[mapname] = mapdata
+
+def calculate_torii_dipole(C: np.ndarray, O: np.ndarray, N: np.ndarray) -> np.ndarray:
     """
     Calculate Torii dipole (NumPy version).
 
@@ -64,7 +77,7 @@ def calculate_torii_dipole_numpy(C: np.ndarray, O: np.ndarray, N: np.ndarray) ->
     return mu.astype(np.float32)
 
 
-def calculate_torii_dipole_batch_numpy(C: np.ndarray, O: np.ndarray, N: np.ndarray) -> np.ndarray:
+def calculate_torii_dipole_batch(C: np.ndarray, O: np.ndarray, N: np.ndarray) -> np.ndarray:
     """
     Vectorized Torii dipole calculation for multiple oscillators (NumPy).
 
@@ -112,59 +125,63 @@ def calculate_torii_dipole_batch_numpy(C: np.ndarray, O: np.ndarray, N: np.ndarr
 
     return mu.astype(np.float32)
 
+def calc_dihedral(pos1: np.ndarray, pos2: np.ndarray, pos3: np.ndarray, pos4: np.ndarray) -> float:
+    
+    u1 = pos2 - pos1
+    u2 = pos3 - pos2
+    u3 = pos4 - pos3
+    
+    cross12 = np.cross(u1, u2)
+    cross23 = np.cross(u2, u3)
+    
+    norm2 = np.linalg.norm(u2)
+    
+    y = np.dot((norm2 * u1), cross23)
+    x = np.dot(cross12, cross23)
+    
+    return np.atan2(y, x)
+    
 
-def calculate_torii_dipole_batch_torch(C: torch.Tensor, O: torch.Tensor, N: torch.Tensor) -> torch.Tensor:
+def calculate_coupling_matrix(data: Dict, use_predicted: bool = False) -> np.ndarray:
+    
+    J = calculate_TDC(data['dipoles'], data['C_positions'], data['N_positions'], data['O_positions'])
+    
+    backbone_indices = np.where(np.logical_or(data['oscillator_types'] == 0, data['oscillator_types'] == 1))[0]
+    proline_indices = np.where(data['oscillator_types'] == 1)[0]
+    
+    for i in backbone_indices[:-1]:
+        j = backbone_indices[i+1]
+        mapname = "Coupling"
+        
+        osc = data['frame_oscillators'][i]
+        # If proline is present, NNC maps needs stereochemistry
+        if i in proline_indices or j in proline_indices:
+            atoms = osc['predicted_atoms'] if use_predicted else osc['atoms']
+            omega = calc_dihedral(atoms['CA_prev'], atoms['C_prev'], atoms['N_curr'], atoms['CA_curr'])
+            
+            if i in proline_indices:
+                if np.abs(omega) < 90.0:
+                    mapname += '_cisPro_transGly'
+                else:
+                    mapname += '_transPro_transGly'
+            else:
+                if np.abs(omega) < 90.0:
+                    mapname += '_cisGly_transPro'
+                else:
+                    mapname += '_transGly_transPro'
+        
+        rama_angles = osc['predicted_rama_nnfs'] if use_predicted else osc['rama_nnfs']
+        nnc_val = calculate_NNC(rama_angles['phi_C'], rama_angles['psi_C'], mapname)
+        J[i,j] = nnc_val
+        J[j,i] = nnc_val
+        
+    return J
+
+
+
+def calculate_TDC(dipoles: np.ndarray, C_positions: np.ndarray, N_positions: np.ndarray, O_positions: np.ndarray) -> np.ndarray:
     """
-    Vectorized Torii dipole calculation for multiple oscillators (PyTorch).
-
-    Args:
-        C: Carbon positions [N, 3]
-        O: Oxygen positions [N, 3]
-        N: Nitrogen positions [N, 3]
-
-    Returns:
-        mu: Dipole vectors [N, 3]
-    """
-    # Vectors
-    CO = O - C  # [N, 3]
-    CN = N - C  # [N, 3]
-
-    # Normalize
-    CO_norm = torch.norm(CO, dim=1, keepdim=True)  # [N, 1]
-    CN_norm = torch.norm(CN, dim=1, keepdim=True)  # [N, 1]
-
-    # Avoid division by zero
-    CO_norm = torch.clamp(CO_norm, min=1e-6)
-    CN_norm = torch.clamp(CN_norm, min=1e-6)
-
-    CO_unit = CO / CO_norm  # [N, 3]
-    CN_unit = CN / CN_norm  # [N, 3]
-
-    # s vector
-    s = 0.665 * CO_unit + 0.258 * CN_unit  # [N, 3]
-
-    # CO · s
-    CO_dot_s = torch.sum(CO_unit * s, dim=1, keepdim=True)  # [N, 1]
-
-    # |s|^2
-    s_mag_sq = torch.sum(s * s, dim=1, keepdim=True)  # [N, 1]
-
-    # sqrt(|s|^2 - (CO · s)^2)
-    discriminant = s_mag_sq - CO_dot_s**2
-    discriminant = torch.clamp(discriminant, min=0)  # numerical safety
-    sqrt_term = torch.sqrt(discriminant)  # [N, 1]
-
-    # Full formula with AIM prefactor
-    mu =  - (CO_dot_s + sqrt_term / tan_10) * CO_unit  # [N, 3]
-    mu = mu / torch.norm(mu, dim=1, keepdim=True)
-    mu = mu * 0.276
-
-    return mu
-
-
-def calculate_tasumi_coupling_numpy(dipoles: np.ndarray, C_positions: np.ndarray) -> np.ndarray:
-    """
-    Calculate Tasumi transition dipole coupling (TDC) matrix.
+    Calculate transition dipole coupling (TDC) matrix.
 
     Formula:
         J_ij = 5034 * (
@@ -181,140 +198,81 @@ def calculate_tasumi_coupling_numpy(dipoles: np.ndarray, C_positions: np.ndarray
     """
     N = len(dipoles)
 
+    CO = O_positions - C_positions
+    CN = N_positions - C_positions
+    
+    CO /= np.linalg.norm(CO, axis=1, keepdims=True)
+    CN /= np.linalg.norm(CN, axis=1, keepdims=True)
+    
+    s = 0.665*CO + 0.258*CN
+    r = s + C_positions
+    
     # Pairwise distance vectors: r_ij = r_j - r_i
-    r_ij = C_positions[:, np.newaxis, :] - C_positions[np.newaxis, :, :]  # [N, N, 3]
+    r_ij = r[:, np.newaxis, :] - r[np.newaxis, :, :]  # [N, N, 3]
 
-    # Distance magnitudes
+    # Distances
     r_mag = np.linalg.norm(r_ij, axis=2)  # [N, N]
-
-    # Avoid division by zero on diagonal
-    r_mag_safe = np.where(r_mag > 1e-6, r_mag, 1.0)
-
-    # r_ij / |r_ij| (unit vectors)
-    r_unit = r_ij / r_mag_safe[:, :, np.newaxis]  # [N, N, 3]
 
     # m_i · m_j
     mu_dot = np.sum(dipoles[:, np.newaxis, :] * dipoles[np.newaxis, :, :], axis=2)  # [N, N]
 
     # m_i · r_ij
-    mu_i_dot_r = np.sum(dipoles[:, np.newaxis, :] * r_unit, axis=2)  # [N, N]
+    mu_i_dot_r = np.sum(dipoles[:, np.newaxis, :] * r_ij, axis=2)  # [N, N]
 
     # m_j · r_ij
-    mu_j_dot_r = np.sum(dipoles[np.newaxis, :, :] * r_unit, axis=2)  # [N, N]
+    mu_j_dot_r = np.sum(dipoles[np.newaxis, :, :] * r_ij, axis=2)  # [N, N]
 
     # Coupling formula
-    r3 = r_mag_safe**3
-    r5 = r_mag_safe**5
+    r3 = r_mag**3
+    r5 = r_mag**5
+    
+    # Ignore the division by zero warnings from i=j
+    with warnings.catch_warnings(action='ignore'):
+        J = 5034.0 * (mu_dot / r3 - 3.0 * mu_i_dot_r * mu_j_dot_r / r5)  # [N, N]
 
-    J = 5034.0 * (mu_dot / r3 - 3.0 * mu_i_dot_r * mu_j_dot_r / r5)  # [N, N]
-
-    # Set diagonal to zero (self-coupling is not included)
+    # Set diagonal to zero
     np.fill_diagonal(J, 0.0)
 
-    # Set very close oscillators (< 1 Angstrom) to zero
-    J = np.where(r_mag < 1.0, 0.0, J)
-
     return J.astype(np.float32)
+    
 
 
-def calculate_tasumi_coupling_torch(dipoles: torch.Tensor, C_positions: torch.Tensor) -> torch.Tensor:
-    """
-    Calculate Tasumi TDC matrix (PyTorch version).
+def calculate_NNC(phi: float, psi: float, mapname: str) -> float:
+    dim = 13
+    space = 30
+    
+    # Rounding based on recent bug fix in AIM
+    phi = round(phi, 4)
+    psi = round(psi, 4)
+    
+    phi_N = int((phi + 180) // space)
+    psi_N = int((psi + 180) // space)
+    if phi_N == dim - 1:
+        phi_N = dim-2
+    if psi_N == dim - 1:
+        psi_N = dim-2
+    
+    map = NNmap[mapname]
+    if phi_N >= 0 and phi_N < dim-1 and psi_N >= 0 and psi_N < dim-1:
+        # determine lower and higher bound
+        x1l = phi_N * space - 180
+        x2l = psi_N * space - 180
 
-    Args:
-        dipoles: Dipole vectors [N, 3]
-        C_positions: Carbon positions [N, 3]
+        y1 = map[psi_N, phi_N]
+        y2 = map[psi_N+1, phi_N]
+        y3 = map[psi_N+1, phi_N+1]
+        y4 = map[psi_N, phi_N+1]
 
-    Returns:
-        J: Coupling matrix [N, N]
-    """
-    N = dipoles.shape[0]
+        u = (phi_ang - x1l)/space
+        t = (psi_ang - x2l)/space
 
-    # Pairwise distance vectors
-    r_ij = C_positions.unsqueeze(1) - C_positions.unsqueeze(0)  # [N, N, 3]
-
-    # Distance magnitudes
-    r_mag = torch.norm(r_ij, dim=2)  # [N, N]
-
-    # Avoid division by zero
-    r_mag_safe = torch.where(r_mag > 1e-6, r_mag, torch.ones_like(r_mag))
-
-    # Unit vectors
-    r_unit = r_ij / r_mag_safe.unsqueeze(2)  # [N, N, 3]
-
-    # m_i · m_j
-    mu_dot = torch.sum(dipoles.unsqueeze(1) * dipoles.unsqueeze(0), dim=2)  # [N, N]
-
-    # m_i · r_ij and m_j · r_ij
-    mu_i_dot_r = torch.sum(dipoles.unsqueeze(1) * r_unit, dim=2)  # [N, N]
-    mu_j_dot_r = torch.sum(dipoles.unsqueeze(0) * r_unit, dim=2)  # [N, N]
-
-    # Coupling formula
-    r3 = r_mag_safe**3
-    r5 = r_mag_safe**5
-
-    J = 5034.0 * (mu_dot / r3 - 3.0 * mu_i_dot_r * mu_j_dot_r / r5)
-
-    # Zero out diagonal and close pairs
-    mask = (r_mag >= 1.0)
-    J = J * mask.float()
-    J = J - torch.diag(torch.diag(J))  # ensure diagonal is zero
-
-    return J
-
-
-def calculate_tasumi_coupling_batch_torch(dipoles: torch.Tensor, C_positions: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
-    """
-    Batched Tasumi coupling calculation.
-
-    Args:
-        dipoles: [B, N, 3]
-        C_positions: [B, N, 3]
-        mask: [B, N] - 1 for valid, 0 for padded
-
-    Returns:
-        J_matrix: [B, N, N]
-    """
-    B, N, _ = dipoles.shape
-    device = dipoles.device
-
-    # Pairwise distance vectors: r_ij = r_j - r_i
-    r_ij = C_positions.unsqueeze(2) - C_positions.unsqueeze(1)
-
-    # Distance magnitudes [B, N, N]
-    r_mag = torch.norm(r_ij, dim=3)
-
-    # For close pairs (<1 Å) and diagonal, use safe distance to prevent division issues
-    # Padded atoms are at z=1000 Å, so their distances are ~1000 Å (safe)
-    r_mag_safe = torch.clamp(r_mag, min=1.0)  # Minimum distance 1 Å
-
-    # Unit vectors [B, N, N, 3]
-    r_unit = r_ij / r_mag_safe.unsqueeze(3)
-
-    # Compute dot products for Tasumi formula
-    mu_dot = torch.sum(dipoles.unsqueeze(2) * dipoles.unsqueeze(1), dim=3)  # [B, N, N]
-    mu_i_dot_r = torch.sum(dipoles.unsqueeze(2) * r_unit, dim=3)  # [B, N, N]
-    mu_j_dot_r = torch.sum(dipoles.unsqueeze(1) * r_unit, dim=3)  # [B, N, N]
-
-    # Tasumi coupling formula: J = 5034 * [μ_i·μ_j / r³ - 3(μ_i·r)(μ_j·r) / r⁵]
-    r3 = r_mag_safe**3
-    r5 = r_mag_safe**5
-    J = 5034.0 * (mu_dot / r3 - 3.0 * mu_i_dot_r * mu_j_dot_r / r5)
-
-    # Zero out diagonal (self-coupling)
-    eye = torch.eye(N, device=device).unsqueeze(0).expand(B, -1, -1)
-    J = J * (1 - eye)
-
-    # Zero out very close pairs (< 1 Å) - physical cutoff
-    close_mask = (r_mag >= 1.0).float()
-    J = J * close_mask
-
-    # Apply oscillator mask to zero out contributions from padded oscillators
-    mask_2d = mask.unsqueeze(2) * mask.unsqueeze(1)  # [B, N, N]
-    J = J * mask_2d
-
-    return J
-
+        # bilinear interpolation
+        delta = (1-u)*(1-t)*y1 + (1-u)*t*y2 + u*t*y3 + u*(1-t)*y4
+    else:
+        delta = 0.0
+    
+    return delta
+    
 
 def generate_spectrum_numpy(
     H_diag: np.ndarray,

@@ -1,32 +1,29 @@
 #!/usr/bin/env python3
 
+# Import from standard libraries
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import argparse
 import json
-import torch
-import numpy as np
-import matplotlib.pyplot as plt
 from pathlib import Path
 from typing import Dict, List
+
+# Import from 3rd party libraries
+import numpy as np
+import matplotlib.pyplot as plt
 from tqdm import tqdm
+import torch
+from torch.utils.data import DataLoader
 
 # Import from main codebase
 from train.model import create_model
 from train.dataset import SpectrumDataset, collate_fn_pad
 from train.data_utils import load_pkl_data, organize_by_frames, filter_frames_by_quality
-from torch.utils.data import DataLoader
+from train.physics import batch_generate_spectra_torch
 
-# Import physics functions
-from train.physics import (
-    calculate_torii_dipole_batch_torch,
-    batch_generate_spectra_torch,
-    calculate_tasumi_coupling_batch_torch
-)
-
-# Publication-quality plotting
+# Matplotlib settings
 plt.rcParams['font.family'] = 'DejaVu Sans'
 plt.rcParams['font.size'] = 12
 plt.rcParams['axes.labelsize'] = 14
@@ -70,28 +67,16 @@ def inference_on_dataloader(
             C_positions_pred = batch['C_positions_pred'].to(device)
             O_positions_pred = batch['O_positions_pred'].to(device)
             N_positions_pred = batch['N_positions_pred'].to(device)
+            dipoles_true = batch['dipoles_true'].to(device)
+            dipoles_pred = batch['dipoles_pred'].to(device)
+            J_matrix_true = batch['J_matrix_true'].to(device)
+            J_matrix_pred = batch['J_matrix_pred'].to(device)
             spectrum_true = batch['spectrum_true'].to(device)
             oscillator_mask = batch['oscillator_mask'].to(device)
             frame_indices = batch['frame_indices']
 
             # Forward pass: predict H_diag
             H_diag_pred = model(own_features, neighbor_features, neighbor_mask)
-
-            # Calculate dipoles
-            dipoles_pred = calculate_torii_dipole_batch_torch(
-                C_positions_pred, O_positions_pred, N_positions_pred
-            )
-
-            # Calculate dipoles for ground truth
-            dipoles_true = batch['dipoles_true'].to(device)
-
-            # Calculate couplings for predicted
-            J_matrix_pred = calculate_tasumi_coupling_batch_torch(
-                dipoles_pred, C_positions_pred, oscillator_mask
-            )
-
-            # Get ground truth coupling matrix (already calculated in dataset)
-            J_matrix_true = batch['J_matrix_true'].to(device)
 
             # Generate IR spectrum
             spectrum_pred = batch_generate_spectra_torch(

@@ -373,6 +373,7 @@ def extract_ground_truth_data(frame_oscillators: List[Dict]) -> Dict:
     C_positions = np.zeros((N, 3), dtype=np.float32)
     O_positions = np.zeros((N, 3), dtype=np.float32)
     N_positions = np.zeros((N, 3), dtype=np.float32)
+    dipoles = np.zeros((N, 3)), dtype=np.float32)
     oscillator_types = np.zeros(N, dtype=np.int64)
     charges = np.zeros(N, dtype=np.float32)
 
@@ -386,6 +387,9 @@ def extract_ground_truth_data(frame_oscillators: List[Dict]) -> Dict:
         O_positions[i] = O
         N_positions[i] = N_atom
 
+        # Transition dipoles
+        dipoles[i] = osc['atomistic_dipole']
+
         # Type and charge
         oscillator_types[i] = get_oscillator_type_encoding(osc)
         charges[i] = get_oscillator_charge(osc)
@@ -395,6 +399,7 @@ def extract_ground_truth_data(frame_oscillators: List[Dict]) -> Dict:
         'C_positions': C_positions,
         'O_positions': O_positions,
         'N_positions': N_positions,
+        'dipoles': dipoles,
         'oscillator_types': oscillator_types,
         'charges': charges,
         'frame_oscillators': frame_oscillators,
@@ -416,6 +421,7 @@ def extract_predicted_data(frame_oscillators: List[Dict]) -> Dict:
     C_positions = np.zeros((N, 3), dtype=np.float32)
     O_positions = np.zeros((N, 3), dtype=np.float32)
     N_positions = np.zeros((N, 3), dtype=np.float32)
+    dipoles = np.zeros((N, 3), dtype=np.float32)
     oscillator_types = np.zeros(N, dtype=np.int64)
     charges = np.zeros(N, dtype=np.float32)
 
@@ -428,7 +434,10 @@ def extract_predicted_data(frame_oscillators: List[Dict]) -> Dict:
         C_positions[i] = C
         O_positions[i] = O
         N_positions[i] = N_atom
-
+        
+        # Predicted transition dipoles
+        dipoles[i] = osc['predicted_dipole']
+        
         # Type and charge
         oscillator_types[i] = get_oscillator_type_encoding(osc)
         charges[i] = get_oscillator_charge(osc)
@@ -447,6 +456,7 @@ def extract_predicted_data(frame_oscillators: List[Dict]) -> Dict:
         'C_positions': C_positions,
         'O_positions': O_positions,
         'N_positions': N_positions,
+        'dipoles': dipoles,
         'oscillator_types': oscillator_types,
         'charges': charges,
         'rama_angles': rama_angles,
