@@ -31,7 +31,7 @@ python inference_spectra.py \
 ### Training a New Model
 
 ```bash
-python train/main.py \
+python train_model.py \
     --train_dir path/to/train/data/ \
     --test_dir path/to/test/data/ \
     --output_dir checkpoints/ \
@@ -78,7 +78,7 @@ pkl_data = {
 ### Basic Training
 
 ```bash
-python train/main.py \
+python train_model.py \
     --train_dir /path/to/training/pkl/files/ \
     --test_dir /path/to/test/pkl/files/ \
     --output_dir ./checkpoints/
@@ -87,7 +87,7 @@ python train/main.py \
 ### Full Training Options
 
 ```bash
-python train/main.py \
+python train_model.py \
     --train_dir /path/to/train/ \
     --test_dir /path/to/test/ \
     --output_dir ./checkpoints/ \
