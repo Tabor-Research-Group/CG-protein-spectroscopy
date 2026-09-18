@@ -8,11 +8,7 @@ import numpy as np
 from typing import Dict, List, Tuple
 from pathlib import Path
 from tqdm import tqdm
-from .physics import (
-    calculate_torii_dipole_batch_torch,
-    calculate_tasumi_coupling_batch_torch,
-    batch_generate_spectra_torch
-)
+from .physics import batch_generate_spectra_torch
 
 
 class SpectrumLoss(nn.Module):
