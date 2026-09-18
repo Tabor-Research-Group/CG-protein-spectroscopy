@@ -408,7 +408,7 @@ def main():
         # Train
         train_metrics = train_one_epoch(
             model, train_loader, optimizer, criterion, device,
-            epoch, omega_grid_tensor, scheduler
+            epoch, omega_grid_tensor, scheduler, args.gamma
         )
 
         print(f"\nTrain Metrics:")
@@ -421,7 +421,7 @@ def main():
 
         # Evaluate
         test_metrics, sample_results = evaluate(
-            model, test_loader, criterion, device, omega_grid_tensor
+            model, test_loader, criterion, device, omega_grid_tensor, args.gamma
         )
 
         print(f"\nTest Metrics:")
@@ -610,7 +610,7 @@ def main():
     print("="*80)
 
     final_test_metrics, final_sample_results = evaluate(
-        model, test_loader, criterion, device, omega_grid_tensor
+        model, test_loader, criterion, device, omega_grid_tensor, args.gamma
     )
 
     print(f"\nFinal Test Metrics:")
