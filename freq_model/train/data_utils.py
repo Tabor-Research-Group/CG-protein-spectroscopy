@@ -373,7 +373,7 @@ def extract_ground_truth_data(frame_oscillators: List[Dict]) -> Dict:
     C_positions = np.zeros((N, 3), dtype=np.float32)
     O_positions = np.zeros((N, 3), dtype=np.float32)
     N_positions = np.zeros((N, 3), dtype=np.float32)
-    dipoles = np.zeros((N, 3)), dtype=np.float32)
+    dipoles = np.zeros((N, 3), dtype=np.float32)
     oscillator_types = np.zeros(N, dtype=np.int64)
     charges = np.zeros(N, dtype=np.float32)
 

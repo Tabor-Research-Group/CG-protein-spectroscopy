@@ -7,13 +7,15 @@ import warnings
 import numpy as np
 import torch
 from typing import Tuple, Dict
+from pathlib import Path
 
 # tan(10°)
 tan_10 = np.tan(np.radians(10.0))
 
 
 NNC_map = {}
-with open('nnc_map.dat') as f:
+mapfile = Path(__file__).parent / 'nnc_map.dat'
+with open(mapfile) as f:
     for map_num in range(5):
         mapname = f.readline().strip()
         mapdata = []

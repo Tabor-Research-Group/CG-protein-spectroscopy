@@ -417,14 +417,6 @@ def main():
         print(f"  Spectrum Corr: {train_metrics['spectrum_corr']:.4f}")
         print(f"  Peak Error: {train_metrics['peak_error_cm']:.2f} cm⁻¹")
         print(f"  Site Energy MAE: {train_metrics['site_energy_mae']:.2f} cm⁻¹")
-        # Print new multi-scale loss components
-        if 'loss_fine' in train_metrics:
-            print(f"  Multi-scale Loss Components:")
-            print(f"    Fine (exact):     {train_metrics['loss_fine']:.6f}")
-            print(f"    Medium (shapes):  {train_metrics['loss_medium']:.6f}")
-            print(f"    Coarse (envelope):{train_metrics['loss_coarse']:.6f}")
-            print(f"    Multi-peak:       {train_metrics['loss_peaks']:.6f}")
-            print(f"    Gradient:         {train_metrics['loss_gradient']:.6f}")
         print(f"  Current LR: {scheduler.get_last_lr()[0]:.2e}")
 
         # Evaluate
