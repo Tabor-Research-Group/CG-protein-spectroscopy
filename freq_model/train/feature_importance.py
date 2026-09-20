@@ -20,8 +20,8 @@ from tqdm import tqdm
 # Feature names for interpretation
 OWN_FEATURE_NAMES = [
     'OscType_Regular', 'OscType_PRO', 'OscType_Sidechain',  # 0-2
-    'sin(φ)', 'cos(φ)', 'sin(ψ)', 'cos(ψ)',  # 3-6
-    'sin(φ_prev)', 'cos(φ_prev)', 'sin(ψ_next)', 'cos(ψ_next)',  # 7-10
+    'sin(φ_N)', 'cos(φ_N)', 'sin(ψ_N)', 'cos(ψ_N)',  # 3-6
+    'sin(φ_C)', 'cos(φ_C)', 'sin(ψ_C)', 'cos(ψ_C)',  # 7-10
     'SS_Coil', 'SS_Helix', 'SS_Sheet', 'SS_Turn',  # 11-14
     'Charge',  # 15
 ]
@@ -30,8 +30,8 @@ NEIGHBOR_FEATURE_NAMES = [
     '1/r³',  # 0
     'sin(θ)', 'cos(θ)', 'sin(φ)', 'cos(φ)',  # 1-4
     'Charge',  # 5
-    'sin(φ)', 'cos(φ)', 'sin(ψ)', 'cos(ψ)',  # 6-9
-    'sin(φ_prev)', 'cos(φ_prev)', 'sin(ψ_next)', 'cos(ψ_next)',  # 10-13
+    'sin(φ_N)', 'cos(φ_N)', 'sin(ψ_N)', 'cos(ψ_N)',  # 6-9
+    'sin(φ_C)', 'cos(φ_C)', 'sin(ψ_C)', 'cos(ψ_C)',  # 10-13
     'SS_Coil', 'SS_Helix', 'SS_Sheet', 'SS_Turn',  # 14-17
 ]
 
