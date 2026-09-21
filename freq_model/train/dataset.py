@@ -114,7 +114,7 @@ class SpectrumDataset(Dataset):
             'spectrum_true': torch.from_numpy(spectrum_true).float(),
             'dipoles_true': torch.from_numpy(dipoles_true).float(),
             'J_matrix_true': torch.from_numpy(J_matrix_true).float(),
-            'dipoles_pred': torch.from_numpy(dipole_pred).float(),
+            'dipoles_pred': torch.from_numpy(dipoles_pred).float(),
             'J_matrix_pred': torch.from_numpy(J_matrix_pred).float(),
             'frame_idx': frame_idx,
         }
@@ -199,7 +199,7 @@ def collate_fn_pad(batch: List[Dict]) -> Dict[str, torch.Tensor]:
         'N_positions_pred': N_positions_pred,
         'spectrum_true': spectrum_true,
         'dipoles_true': dipoles_true,
-        'dipoles_pred': dipole_pred,
+        'dipoles_pred': dipoles_pred,
         'J_matrix_true': J_matrix_true,
         'J_matrix_pred': J_matrix_pred,
         'oscillator_mask': oscillator_mask,

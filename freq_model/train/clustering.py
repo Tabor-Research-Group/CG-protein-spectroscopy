@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 import warnings
 warnings.filterwarnings('ignore')
 
-from .physics import calculate_torii_dipole_batch_numpy, calculate_tasumi_coupling_numpy, generate_spectrum_numpy
+from .physics import calculate_coupling_matrix, generate_spectrum_numpy
 from .data_utils import extract_ground_truth_data
 
 
@@ -191,15 +191,11 @@ def generate_and_cluster_spectra(
         # Get ground truth data
         gt_data = extract_ground_truth_data(frames_dict[frame_idx])
 
-        # Calculate ground truth dipoles (from atomistic atoms)
-        dipoles = calculate_torii_dipole_batch_numpy(
-            gt_data['C_positions'],
-            gt_data['O_positions'],
-            gt_data['N_positions']
-        )
+        # Extract ground truth dipoles (from atomistic atoms)
+        dipoles = gt_data['dipoles']
 
         # Calculate coupling matrix
-        J_matrix = calculate_tasumi_coupling_numpy(dipoles, gt_data['C_positions'])
+        J_matrix = calculate_coupling_matrix(gt_data)
 
         # Generate spectrum
         omega_grid, spectrum = generate_spectrum_numpy(

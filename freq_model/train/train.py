@@ -8,11 +8,7 @@ import numpy as np
 from typing import Dict, List, Tuple
 from pathlib import Path
 from tqdm import tqdm
-from .physics import (
-    calculate_torii_dipole_batch_torch,
-    calculate_tasumi_coupling_batch_torch,
-    batch_generate_spectra_torch
-)
+from .physics import batch_generate_spectra_torch
 
 
 class SpectrumLoss(nn.Module):
@@ -200,6 +196,7 @@ def train_one_epoch(
     epoch: int,
     omega_grid: torch.Tensor,
     scheduler=None,
+    gamma: float = 10.0,
 ) -> Dict[str, float]:
     """
     Train for one epoch with progress bar and diagnostics.
@@ -276,7 +273,7 @@ def train_one_epoch(
         spectrum_pred = batch_generate_spectra_torch(
             H_diag_pred, J_matrix_pred, dipoles_pred,
             mask_batch=oscillator_mask,
-            omega_min=1500.0, omega_max=1750.0, omega_step=1.0, gamma=10.0
+            omega_min=1500.0, omega_max=1750.0, omega_step=1.0, gamma=gamma
         )
 
         # Compute loss: Correlation + MSE + H_diag
@@ -392,7 +389,8 @@ def evaluate(
     test_loader: DataLoader,
     criterion: SpectrumLoss,
     device: torch.device,
-    omega_grid: torch.Tensor
+    omega_grid: torch.Tensor,
+    gamma: float = 10.0,
 ) -> Tuple[Dict[str, float], List[Dict]]:
     """
     Evaluate model on test set with detailed diagnostics.
@@ -447,7 +445,7 @@ def evaluate(
         spectrum_pred = batch_generate_spectra_torch(
             H_diag_pred, J_matrix_pred, dipoles_pred,
             mask_batch=oscillator_mask,
-            omega_min=1500.0, omega_max=1750.0, omega_step=1.0, gamma=10.0
+            omega_min=1500.0, omega_max=1750.0, omega_step=1.0, gamma=gamma
         )
 
         # Compute loss

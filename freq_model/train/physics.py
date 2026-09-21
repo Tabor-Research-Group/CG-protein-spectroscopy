@@ -7,13 +7,15 @@ import warnings
 import numpy as np
 import torch
 from typing import Tuple, Dict
+from pathlib import Path
 
 # tan(10°)
 tan_10 = np.tan(np.radians(10.0))
 
 
 NNC_map = {}
-with open('nnc_map.dat') as f:
+mapfile = Path(__file__).parent / 'nnc_map.dat'
+with open(mapfile) as f:
     for map_num in range(5):
         mapname = f.readline().strip()
         mapdata = []
@@ -252,7 +254,7 @@ def calculate_NNC(phi: float, psi: float, mapname: str) -> float:
     if psi_N == dim - 1:
         psi_N = dim-2
     
-    map = NNmap[mapname]
+    map = NNC_map[mapname]
     if phi_N >= 0 and phi_N < dim-1 and psi_N >= 0 and psi_N < dim-1:
         # determine lower and higher bound
         x1l = phi_N * space - 180
@@ -263,8 +265,8 @@ def calculate_NNC(phi: float, psi: float, mapname: str) -> float:
         y3 = map[psi_N+1, phi_N+1]
         y4 = map[psi_N, phi_N+1]
 
-        u = (phi_ang - x1l)/space
-        t = (psi_ang - x2l)/space
+        u = (phi - x1l)/space
+        t = (psi - x2l)/space
 
         # bilinear interpolation
         delta = (1-u)*(1-t)*y1 + (1-u)*t*y2 + u*t*y3 + u*(1-t)*y4
