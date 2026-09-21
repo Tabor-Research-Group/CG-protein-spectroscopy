@@ -372,12 +372,14 @@ def main():
         'train_spectrum_mse': [],
         'train_spectrum_corr': [],
         'train_peak_error_cm': [],
-        'train_site_energy_mae': [],
+        'train_site_frequency_mae': [],
+        'train_site_frequency_mse': [],
         'test_loss': [],
         'test_spectrum_mse': [],
         'test_spectrum_corr': [],
         'test_peak_error_cm': [],
-        'test_site_energy_mae': [],
+        'test_site_frequency_mae': [],
+        'test_site_frequency_mse': [],
     }
 
     # Per-protein tracking
@@ -416,7 +418,8 @@ def main():
         print(f"  Spectrum MSE: {train_metrics['spectrum_mse']:.6f}")
         print(f"  Spectrum Corr: {train_metrics['spectrum_corr']:.4f}")
         print(f"  Peak Error: {train_metrics['peak_error_cm']:.2f} cm⁻¹")
-        print(f"  Site Energy MAE: {train_metrics['site_energy_mae']:.2f} cm⁻¹")
+        print(f"  Site Frequency MAE: {train_metrics['site_frequency_mae']:.2f} cm⁻¹")
+        print(f"  Site Frequency RMSE: {np.sqrt(train_metrics['site_frequency_mse']):.2f} cm⁻¹")
         print(f"  Current LR: {scheduler.get_last_lr()[0]:.2e}")
 
         # Evaluate
@@ -429,20 +432,24 @@ def main():
         print(f"  Spectrum MSE: {test_metrics['spectrum_mse']:.6f}")
         print(f"  Spectrum Corr: {test_metrics['spectrum_corr']:.4f}")
         print(f"  Peak Error: {test_metrics['peak_error_cm']:.2f} cm⁻¹")
-        print(f"  Site Energy MAE: {test_metrics['site_energy_mae']:.2f} cm⁻¹")
+        print(f"  Site Frequency MAE: {test_metrics['site_frequency_mae']:.2f} cm⁻¹")
+        print(f"  Site Frequency RMSE: {np.sqrt(test_metrics['site_frequency_mse']):.2f} cm⁻¹")
+
 
         # Update history
         history['train_loss'].append(train_metrics['loss'])
         history['train_spectrum_mse'].append(train_metrics['spectrum_mse'])
         history['train_spectrum_corr'].append(train_metrics['spectrum_corr'])
         history['train_peak_error_cm'].append(train_metrics['peak_error_cm'])
-        history['train_site_energy_mae'].append(train_metrics['site_energy_mae'])
+        history['train_site_frequency_mae'].append(train_metrics['site_frequency_mae'])
+        history['train_site_frequency_mse'].append(train_metrics['site_frequency_mse'])
 
         history['test_loss'].append(test_metrics['loss'])
         history['test_spectrum_mse'].append(test_metrics['spectrum_mse'])
         history['test_spectrum_corr'].append(test_metrics['spectrum_corr'])
         history['test_peak_error_cm'].append(test_metrics['peak_error_cm'])
-        history['test_site_energy_mae'].append(test_metrics['site_energy_mae'])
+        history['test_site_frequency_mae'].append(test_metrics['site_frequency_mae'])
+        history['test_site_frequency_mse'].append(test_metrics['site_frequency_mse'])
 
         # Learning rate schedule
         scheduler.step(test_metrics['loss'])

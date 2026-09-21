@@ -31,6 +31,7 @@ loss)
         self.lambda_corr = 1.0       # Weight for correlation loss
         self.lambda_mse = 1.0        # Weight for MSE loss
         self.lambda_grad = 500.0       # Weight for gradient loss (prevents flat/mean predictions)
+        self.lambda_site = 1.0
 
         self.register_buffer('omega_grid', omega_grid)
 
@@ -106,9 +107,13 @@ loss)
 
         # MSE on gradients
         loss_grad = F.mse_loss(grad_pred, grad_true)
-
-        # 4. Total loss (weighted combination)
-        loss_total = self.lambda_corr * loss_corr + self.lambda_mse * loss_mse + self.lambda_grad * loss_grad
+        
+        # 4. Loss on individual site frequencies (MSE)
+        # oscillator_mask passed as weight to zero out padding oscillators
+        loss_site = F.mse_loss(H_diag_pred, H_diag_true, weight=oscillator_mask)
+        
+        # 5. Total loss (weighted combination)
+        loss_total = self.lambda_corr * loss_corr + self.lambda_mse * loss_mse + self.lambda_grad * loss_grad + self.lambda_site * loss_site
       
         # Prepare loss dictionary
         loss_dict = {
@@ -117,6 +122,7 @@ loss)
             'correlation': correlation.item(),
             'corr_loss': loss_corr.item(),
             'grad_loss': loss_grad.item(),
+            'site_freq_loss': loss_site.item(),
         }
 
         return loss_total, loss_dict
@@ -170,20 +176,29 @@ def compute_metrics(
         peak_errors.append(abs(peak_pred - peak_true))
     peak_error = np.mean(peak_errors)
 
-    # Site energy MAE (only for valid oscillators)
+    # Site frequency MAE (only for valid oscillators)
     valid_mask = oscillator_mask > 0.5
     if valid_mask.sum() > 0:
         H_diff = torch.abs(H_diag_pred - H_diag_true) * oscillator_mask
-        site_energy_mae = torch.sum(H_diff) / torch.sum(oscillator_mask)
-        site_energy_mae = site_energy_mae.item()
+        site_frequency_mae = torch.sum(H_diff) / torch.sum(oscillator_mask)
+        site_frequency_mae = site_frequency_mae.item()
     else:
-        site_energy_mae = 0.0
+        site_frequency_mae = 0.0
+
+    # Site frequency MSE
+    if valid_mask.sum() > 0:
+        H_diff = (H_diag_pred - H_diag_true) * oscillator_mask
+        site_frequency_mse = H_diff**2 / torch.sum(oscillator_mask)
+        site_frequency_mse = site_frequency_mse.item()
+    else:
+        site_frequency_mse = 0.0
 
     return {
         'spectrum_mse': spectrum_mse,
         'spectrum_corr': spectrum_corr,
         'peak_error_cm': peak_error,
-        'site_energy_mae': site_energy_mae,
+        'site_frequency_mae': site_frequency_mae,
+        'site_frequency_mse': site_frequency_mse,
     }
 
 
@@ -225,7 +240,8 @@ def train_one_epoch(
         'spectrum_mse': [],
         'spectrum_corr': [],
         'peak_error_cm': [],
-        'site_energy_mae': [],
+        'site_frequency_mae': [],
+        'site_frequency_mse': [],
     }
     grad_norms = []
     skipped_batches = 0
@@ -348,7 +364,8 @@ def train_one_epoch(
         'spectrum_mse': np.mean(metrics_accum['spectrum_mse']) if metrics_accum['spectrum_mse'] else 0.0,
         'spectrum_corr': np.mean(metrics_accum['spectrum_corr']) if metrics_accum['spectrum_corr'] else 0.0,
         'peak_error_cm': np.mean(metrics_accum['peak_error_cm']) if metrics_accum['peak_error_cm'] else 0.0,
-        'site_energy_mae': np.mean(metrics_accum['site_energy_mae']) if metrics_accum['site_energy_mae'] else 0.0,
+        'site_frequency_mae': np.mean(metrics_accum['site_frequency_mae']) if metrics_accum['site_frequency_mae'] else 0.0,
+        'site_frequency_mse': np.mean(metrics_accum['site_frequency_mse']) if metrics_accum['site_frequency_mse'] else 0.0,
     }
 
     # Print detailed epoch statistics
@@ -363,7 +380,8 @@ def train_one_epoch(
     print(f"      MSE:            {avg_metrics['spectrum_mse']:.6f}")
     print(f"      Peak Error:     {avg_metrics['peak_error_cm']:.2f} cm⁻¹")
     print(f"    H_diag Prediction:")
-    print(f"      MAE:            {avg_metrics['site_energy_mae']:.2f} cm⁻¹")
+    print(f"      MAE:            {avg_metrics['site_frequency_mae']:.2f} cm⁻¹")
+    print(f"      RMSE:            {np.sqrt(avg_metrics['site_frequency_mse']):.2f} cm⁻¹")
 
     # Gradient statistics
     if len(grad_norms) > 0:
@@ -417,7 +435,8 @@ def evaluate(
         'spectrum_mse': [],
         'spectrum_corr': [],
         'peak_error_cm': [],
-        'site_energy_mae': [],
+        'site_frequency_mae': [],
+        'site_frequency_mse': [],
     }
 
     sample_results = []
@@ -493,7 +512,8 @@ def evaluate(
         'spectrum_mse': np.mean(metrics_accum['spectrum_mse']) if metrics_accum['spectrum_mse'] else 0.0,
         'spectrum_corr': np.mean(metrics_accum['spectrum_corr']) if metrics_accum['spectrum_corr'] else 0.0,
         'peak_error_cm': np.mean(metrics_accum['peak_error_cm']) if metrics_accum['peak_error_cm'] else 0.0,
-        'site_energy_mae': np.mean(metrics_accum['site_energy_mae']) if metrics_accum['site_energy_mae'] else 0.0,
+        'site_frequency_mae': np.mean(metrics_accum['site_frequency_mae']) if metrics_accum['site_frequency_mae'] else 0.0,
+        'site_frequency_mse': np.mean(metrics_accum['site_frequency_mse']) if metrics_accum['site_frequency_mse'] else 0.0,
     }
 
     # Random sample for plotting (limit to 50 frames for efficiency)

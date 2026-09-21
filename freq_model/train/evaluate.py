@@ -68,11 +68,11 @@ def plot_training_curves(
     axes[3].grid(alpha=0.3)
 
     # Site Energy MAE
-    axes[4].plot(epochs, history['train_site_energy_mae'], label='Train', marker='o')
-    axes[4].plot(epochs, history['test_site_energy_mae'], label='Test', marker='s')
+    axes[4].plot(epochs, history['train_site_frequency_mae'], label='Train', marker='o')
+    axes[4].plot(epochs, history['test_site_frequency_mae'], label='Test', marker='s')
     axes[4].set_xlabel('Epoch')
     axes[4].set_ylabel('MAE (cm⁻¹)')
-    axes[4].set_title('Site Energy MAE')
+    axes[4].set_title('Site Frequency MAE')
     axes[4].legend()
     axes[4].grid(alpha=0.3)
 
@@ -359,14 +359,16 @@ def save_metrics_summary(
         f.write(f"  Spectrum MSE: {history['train_spectrum_mse'][-1]:.6f}\n")
         f.write(f"  Spectrum Correlation: {history['train_spectrum_corr'][-1]:.4f}\n")
         f.write(f"  Peak Error: {history['train_peak_error_cm'][-1]:.2f} cm⁻¹\n")
-        f.write(f"  Site Energy MAE: {history['train_site_energy_mae'][-1]:.2f} cm⁻¹\n\n")
+        f.write(f"  Site Frequency MAE: {history['train_site_frequency_mae'][-1]:.2f} cm⁻¹\n\n")
+        f.write(f"  Site Frequency RMSE: {np.sqrt(history['train_site_frequency_mse'][-1]):.2f} cm⁻¹\n\n")
 
         f.write("Final Test Metrics:\n")
         f.write(f"  Loss: {final_test_metrics['loss']:.6f}\n")
         f.write(f"  Spectrum MSE: {final_test_metrics['spectrum_mse']:.6f}\n")
         f.write(f"  Spectrum Correlation: {final_test_metrics['spectrum_corr']:.4f}\n")
         f.write(f"  Peak Error: {final_test_metrics['peak_error_cm']:.2f} cm⁻¹\n")
-        f.write(f"  Site Energy MAE: {final_test_metrics['site_energy_mae']:.2f} cm⁻¹\n\n")
+        f.write(f"  Site Frequency MAE: {final_test_metrics['site_frequency_mae']:.2f} cm⁻¹\n\n")
+        f.write(f"  Site Frequency RMSE: {np.sqrt(final_test_metrics['site_frequency_mse']):.2f} cm⁻¹\n\n")
 
         f.write("Best Test Metrics (across epochs):\n")
         best_corr_epoch = np.argmax(history['test_spectrum_corr']) + 1
