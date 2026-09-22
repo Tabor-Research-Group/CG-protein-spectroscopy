@@ -4,14 +4,11 @@ import pickle
 
 # 3rd party lib imports
 import MDAnalysis as mda
-from MDAnalysis.analysis.dihedrals import Ramachandran
 
 # my lib imports
-from train.physics import calculate_torii_dipole_batch_numpy
+from train.physics import calculate_torii_dipole_batch
 
 def extract_from_universe(u):
-    rama_angles = Ramachandran(u.atoms).run().results.angles
-    
     osc_types = list(set(u.residues.resnames))
     if 'ASN' in osc_types:
         osc_types.append('ASN-SC')
@@ -34,6 +31,13 @@ def extract_from_universe(u):
     carbons = u.select_atoms('name C')[:-1]
     oxygens = u.select_atoms('name O')[:-1]
     nitrogens = u.select_atoms('name N')[1:]
+    alpha_carbons = u.select_atoms('name CA')
+    
+    phi_sel = []
+    psi_sel = []
+    for res in u.residues:
+        phi_sel.append(res.phi_selection())
+        psi_sel.append(res.psi_selection())
     
     data = {key: [] for key in osc_types}
     n = len(u.residues)
@@ -41,8 +45,9 @@ def extract_from_universe(u):
         C_prev_positions = carbons.positions
         O_prev_positions = oxygens.positions
         N_curr_positions = nitrogens.positions
+        CA_positions = alpha_carbons.positions
         
-        dipoles = calculate_torii_dipole_batch_numpy(C_prev_positions, O_prev_positions, N_curr_positions)
+        dipoles = calculate_torii_dipole_batch(C_prev_positions, O_prev_positions, N_curr_positions)
         for i, res in enumerate(u.residues):
             if res.resid < n:
                 osc = {
@@ -50,23 +55,32 @@ def extract_from_universe(u):
                         'residue_key':(res.resid, res.resname),
                         'frame':ts.frame,
                         'oscillator_index':i,
-                        'predicted_atoms':{'C_prev':C_prev_positions[i], 'O_prev':O_prev_positions[i], 'N_curr':N_curr_positions[i]},
+                        'predicted_atoms':{'C_prev':C_prev_positions[i], 'O_prev':O_prev_positions[i], 'N_curr':N_curr_positions[i], 'CA_prev':CA_positions[i], 'CA_curr':CA_positions[i+1]},
                         'predicted_dipole': dipoles[i],
                        }
                 if i == 0:
-                    osc['predicted_rama_nnfs'] = {'phi_N': None, 'psi_N': None, 'phi_C':rama_angles[ts.frame, 0, 0], 'psi_C':rama_angles[ts.frame, 0, 1]}
-                elif i == n - 2:
-                    osc['predicted_rama_nnfs'] = {'phi_N': rama_angles[ts.frame, i-1, 0], 'psi_N': rama_angles[ts.frame, i-1, 1], 'phi_C': None, 'psi_C': None}
+                    psi_N = None
+                    phi_N = None
+                    psi_C = psi_sel[i].dihedral.value()
+                    phi_C = phi_sel[i+1].dihedral.value()
+                elif i == n - 1:
+                    psi_N = psi_sel[i-1].dihedral.value()
+                    phi_N = phi_sel[i].dihedral.value()
+                    psi_C = None
+                    phi_C = None
                 else:
-                    osc['predicted_rama_nnfs'] = {'phi_N': rama_angles[ts.frame, i-1, 0], 'psi_N': rama_angles[ts.frame, i-1, 1], 'phi_C':rama_angles[ts.frame, i, 0], 'psi_C':rama_angles[ts.frame, i, 1]}
-                    
+                    psi_N = psi_sel[i-1].dihedral.value()
+                    phi_N = phi_sel[i].dihedral.value()
+                    psi_C = psi_sel[i].dihedral.value()
+                    phi_C = phi_sel[i+1].dihedral.value() if phi_sel[i+1] else None
+                osc['predicted_rama_nnfs'] = {'psi_N':psi_N, 'phi_N':phi_N, 'psi_C':psi_C, 'phi_C': phi_C}
                 data[res.resname].append(osc)
                 
         if asn_res is not None:
             CG_pos = CG.positions
             OD1_pos = OD1.positions
             ND2_pos = ND2.positions
-            dipoles = calculate_torii_dipole_batch_numpy(CG_pos, OD1_pos, ND2_pos)
+            dipoles = calculate_torii_dipole_batch(CG_pos, OD1_pos, ND2_pos)
             for j, res in enumerate(asn_res):
                 i += 1
                 osc = {
@@ -83,7 +97,7 @@ def extract_from_universe(u):
             CD_pos = CD.positions
             OE1_pos = OE1.positions
             NE2_pos = NE2.positions
-            dipoles = calculate_torii_dipole_batch_numpy(CD_pos, OE1_pos, NE2_pos)
+            dipoles = calculate_torii_dipole_batch(CD_pos, OE1_pos, NE2_pos)
             for j, res in enumerate(gln_res):
                 i += 1
                 osc = {
