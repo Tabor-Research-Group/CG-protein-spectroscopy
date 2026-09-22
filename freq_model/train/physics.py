@@ -141,7 +141,7 @@ def calc_dihedral(pos1: np.ndarray, pos2: np.ndarray, pos3: np.ndarray, pos4: np
     y = np.dot((norm2 * u1), cross23)
     x = np.dot(cross12, cross23)
     
-    return np.atan2(y, x)
+    return np.rad2deg(np.atan2(y, x))
     
 
 def calculate_coupling_matrix(data: Dict, use_predicted: bool = False) -> np.ndarray:
