@@ -188,7 +188,7 @@ def compute_metrics(
     # Site frequency MSE
     if valid_mask.sum() > 0:
         H_diff = (H_diag_pred - H_diag_true) * oscillator_mask
-        site_frequency_mse = H_diff**2 / torch.sum(oscillator_mask)
+        site_frequency_mse = torch.sum(H_diff**2) / torch.sum(oscillator_mask)
         site_frequency_mse = site_frequency_mse.item()
     else:
         site_frequency_mse = 0.0
