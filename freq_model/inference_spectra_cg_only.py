@@ -70,7 +70,7 @@ class InferenceDataset(SpectrumDataset):
             'C_positions_pred': torch.from_numpy(pred_data['C_positions']).float(),
             'O_positions_pred': torch.from_numpy(pred_data['O_positions']).float(),
             'N_positions_pred': torch.from_numpy(pred_data['N_positions']).float(),
-            'dipoles_pred': torch.from_numpy(dipole_pred).float(),
+            'dipoles_pred': torch.from_numpy(dipoles_pred).float(),
             'J_matrix_pred': torch.from_numpy(J_matrix_pred).float(),
             'frame_idx': frame_idx,
         }
@@ -138,7 +138,7 @@ def collate_fn_inference(batch: List[Dict]) -> Dict[str, torch.Tensor]:
         'C_positions_pred': C_positions_pred,
         'O_positions_pred': O_positions_pred,
         'N_positions_pred': N_positions_pred,
-        'dipoles_pred': dipole_pred,
+        'dipoles_pred': dipoles_pred,
         'J_matrix_pred': J_matrix_pred,
         'oscillator_mask': oscillator_mask,
         'frame_indices': frame_indices,
