@@ -80,7 +80,8 @@ def evaluate_per_protein(
             'spectrum_corr': avg_metrics['spectrum_corr'],
             'peak_error_cm': avg_metrics['peak_error_cm'],
             'spectrum_mse': avg_metrics['spectrum_mse'],
-            'site_energy_mae': avg_metrics['site_energy_mae'],
+            'site_frequency_mae': avg_metrics['site_frequency_mae'],
+            'site_frequency_mse': avg_metrics['site_frequency_mse'],
         }
 
     return per_protein_metrics
@@ -111,7 +112,7 @@ def plot_per_protein_evolution(
         ('spectrum_corr', 'Spectrum Correlation', axes[0, 0]),
         ('peak_error_cm', 'Peak Error (cm⁻¹)', axes[0, 1]),
         ('spectrum_mse', 'Spectrum MSE', axes[1, 0]),
-        ('site_energy_mae', 'Site Energy MAE (cm⁻¹)', axes[1, 1])
+        ('site_frequency_mae', 'Site Frequency MAE (cm⁻¹)', axes[1, 1])
     ]
 
     colors = plt.cm.tab10(np.linspace(0, 1, n_proteins))
