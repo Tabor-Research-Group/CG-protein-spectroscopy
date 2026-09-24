@@ -31,7 +31,7 @@ loss)
         self.lambda_corr = 1.0       # Weight for correlation loss
         self.lambda_mse = 1.0        # Weight for MSE loss
         self.lambda_grad = 500.0       # Weight for gradient loss (prevents flat/mean predictions)
-        self.lambda_site = 1.0
+        self.lambda_site = 0.01
 
         self.register_buffer('omega_grid', omega_grid)
 
